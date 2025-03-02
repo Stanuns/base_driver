@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import UInt8
+from std_msgs.msg import UInt8MultiArray
 import serial
 import struct
 
@@ -21,51 +21,64 @@ def calculate_crc(data):
 class IRReceiverNode(Node):
     def __init__(self):
         super().__init__('ir_receiver_node')
-        self.publisher_ = self.create_publisher(UInt8, '/dock_ir_2', 10)
-        self.port= "/dev/ttyUSB0";
+        self.publisher_ = self.create_publisher(UInt8MultiArray, '/dock_ir', 10)
+
+        # 多串口
+        self.ports = ["/dev/ttyUSB0","/dev/ttyUSB1", "/dev/ttyUSB2"] #, "/dev/ttyUSB1", "/dev/ttyUSB2"
+        self.serial_instances = []
+
         # 初始化串口
-        try:
-            self.ser = serial.Serial(
-                port=self.port,
-                baudrate=9600,
-                timeout=1
-            )
-            self.get_logger().info("Serial port %s opened successfully." % self.port)
-        except serial.SerialException as e:
-            self.get_logger().error(f"Failed to open serial port: {e}")
-            raise
-        self.buffer = bytearray()
+        for port in self.ports:
+            try:
+                ser = serial.Serial(
+                    port=port,
+                    baudrate=9600,
+                    timeout=1
+                )
+                self.serial_instances.append({
+                    'ser': ser,
+                    'buffer': bytearray(),
+                    'current_cmd': 0 
+                })
+                self.get_logger().info("Serial port %s opened successfully." % port)
+            except serial.SerialException as e:
+                self.get_logger().error(f"Failed to open serial port {port}, fail: {e}")
+                # raise
+        if not self.serial_instances:
+            self.get_logger().error("No available serial ports, exit!")
+            raise RuntimeError("No available serial ports")
+        
         self.get_logger().info("Dock Infrared Receiver has started.....")
 
-    def parse_packet(self):
+    def parse_packet(self, buffer):
         """
         解析数据包
-        返回: 解析成功返回命令值，失败返回None
+        返回: 解析成功返回命令值, 失败返回None
         """
         while True:
             # 查找帧头0xFFFE
-            start = self.buffer.find(b'\xff\xfe')
+            start = buffer.find(b'\xff\xfe')
             if start == -1:
                 return None
             # 移除帧头前的垃圾数据
-            self.buffer = self.buffer[start:]
+            buffer[:] = buffer[start:]
             # 检查最小包长度
-            if len(self.buffer) < 8:  # 完整包需要8字节
+            if len(buffer) < 8:  # 完整包需要8字节
                 return None
             # 解析数据长度
-            data_length = self.buffer[2]
+            data_length = buffer[2]
             # 检查完整包长度
             total_packet_length = 2 + 1 + data_length + 1  # 头2 + 长度1 + 数据data_length + 尾1
             # 检查数据部分是否完整
-            if len(self.buffer) < total_packet_length:  # 头+长度+数据+尾
+            if len(buffer) < total_packet_length:  # 头+长度+数据+尾
                 return None
             # 检查帧尾
-            if self.buffer[total_packet_length - 1] != 0x00:
-                self.buffer = self.buffer[2:]  # 跳过错误帧头
+            if buffer[total_packet_length - 1] != 0x00:
+                buffer[:] = buffer[2:]  # 跳过错误帧头
                 continue
             # 提取完整数据包
-            packet = self.buffer[:total_packet_length]
-            self.buffer = self.buffer[total_packet_length:]  # 移除已处理数据
+            packet = bytes(buffer[:total_packet_length])
+            buffer[:] = buffer[total_packet_length:]  # 移除已处理数据
             # 提取数据部分（功能码 + 命令 + CRC）
             data_part = packet[3:3 + data_length]
             # 计算CRC
@@ -75,34 +88,57 @@ class IRReceiverNode(Node):
             received_crc = (data_part[3] << 8) | data_part[2]  # 小端模式
             # CRC验证
             if calculated_crc != received_crc:
-                self.get_logger().warn("CRC校验失败")
+                self.get_logger().warn("CRC check fail")
                 continue
             # 提取命令值
             cmd = data_part[1]
             return cmd
-        return None
 
     def process_serial(self):
         """
-        处理串口数据
+        循环处理所有串口数据
         """
         while rclpy.ok():
-            # 读取串口数据
-            data = self.ser.read(self.ser.in_waiting or 1)
-            if data:
-                self.buffer += data
-                # self.get_logger().info(f"Received data: {data}")
-                self.get_logger().debug(f"Raw data: {list(data)}")  # 打印原始字节流
-            # 持续解析数据包
-            while True:
-                cmd = self.parse_packet()
-                if cmd is None:
-                    break
-                # 发布消息
-                msg = UInt8()
-                msg.data = cmd
+            combined_data = []
+            has_new_data = False
+
+            for instance in self.serial_instances:
+                ser = instance['ser']
+                buffer = instance['buffer']
+                current_cmd = instance['current_cmd']
+
+                try:
+                    # 读取串口数据
+                    data = ser.read(ser.in_waiting or 1)
+                    if data:
+                        buffer += data
+                        self.get_logger().debug(f"From serial port {ser.port} Raw data: {list(data)}")  # 打印原始字节流
+                except Exception as e:
+                    self.get_logger().error(f"Serial port {ser.port} read fail: {e}")
+                    continue
+
+                # 持续解析数据包
+                latest_cmd = current_cmd
+                while True:
+                    cmd = self.parse_packet(buffer)
+                    if cmd is None:
+                        break
+                    latest_cmd = cmd
+                    has_new_data = True
+                    
+                instance['current_cmd'] = latest_cmd
+                combined_data.append(latest_cmd)
+
+            # 如果收到新数据则发布组合消息
+            if has_new_data:
+                msg = UInt8MultiArray()
+                msg.data = combined_data
                 self.publisher_.publish(msg)
-                self.get_logger().info(f"发布红外命令: 0x{cmd:02X}")
+                # self.get_logger().info(
+                #     f"发布组合红外数据: [USB0: 0x{combined_data[0]:02X}, "
+                #     f"USB1: 0x{combined_data[1]:02X}, "
+                #     f"USB2: 0x{combined_data[2]:02X}]"
+                # )
 
 def main(args=None):
     rclpy.init(args=args)
@@ -112,7 +148,11 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
-        node.ser.close()
+        for instance in node.serial_instances:
+            try:
+                instance['ser'].close()
+            except Exception as e:
+                node.get_logger().error(f"Error when close serial port: {e}")
         node.destroy_node()
         rclpy.shutdown()
 
