@@ -3,6 +3,7 @@ from rclpy.node import Node
 from std_msgs.msg import UInt8MultiArray
 import serial
 import struct
+from robot_interfaces.msg import DockInfraRed
 
 def calculate_crc(data):
     """
@@ -21,7 +22,7 @@ def calculate_crc(data):
 class IRReceiverNode(Node):
     def __init__(self):
         super().__init__('ir_receiver_node')
-        self.publisher_ = self.create_publisher(UInt8MultiArray, '/dock_ir', 10)
+        self.publisher_ = self.create_publisher(DockInfraRed, '/dock_ir', 10)
 
         # 多串口
         self.ports = ["/dev/ttyUSB0","/dev/ttyUSB1", "/dev/ttyUSB2"] #, "/dev/ttyUSB1", "/dev/ttyUSB2"
@@ -131,8 +132,12 @@ class IRReceiverNode(Node):
 
             # 如果收到新数据则发布组合消息
             if has_new_data:
-                msg = UInt8MultiArray()
-                msg.data = combined_data
+                msg = DockInfraRed()
+                msg.header.frame_id = 'dock_ir'
+                msg.header.stamp = self.get_clock().now().to_msg()
+                msg.rec_left = combined_data[0]
+                msg.rec_midback = combined_data[1]
+                msg.rec_right = combined_data[2]
                 self.publisher_.publish(msg)
                 # self.get_logger().info(
                 #     f"发布组合红外数据: [USB0: 0x{combined_data[0]:02X}, "
