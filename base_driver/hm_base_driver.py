@@ -23,7 +23,6 @@ class HmBaseNode(Node):
             self.get_logger().error("Failed to open serial port!")
             raise Exception("Serial port open failed")
 
-        # 创建订阅者
         self.subscription = self.create_subscription(
             Twist,
             '/cmd_vel',
@@ -35,15 +34,19 @@ class HmBaseNode(Node):
     def handle_cmd_vel(self, msg):
         """处理速度命令的回调函数"""
         try:
-            # 从消息中提取动作值（示例使用linear.x的整数部分）
+            # 消息提取
             self.get_logger().info("---handle_cmd_vel---")
-            action = msg.linear.x
+            linear_action = msg.linear.x
+            angular_action = msg.angular.z
             action_code = 0x00
-            if action > 0:
+            if linear_action > 0 and angular_action == 0:
                 action_code = 4
-            elif action < 0:
+            elif linear_action < 0 and angular_action == 0:
                 action_code = 3
-            # action_code = 0x04
+            elif linear_action == 0 and angular_action > 0:
+                action_code = 2
+            elif linear_action == 0 and angular_action < 0:
+                action_code = 1
             self.send_serial_frame(action_code)
         except ValueError as e:
             self.get_logger().warn(f"Invalid action value: {e}")
