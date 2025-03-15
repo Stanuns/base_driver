@@ -3,8 +3,11 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
+from std_msgs.msg import UInt8  # New import for the new topic
 import serial
 import struct
+from robot_interfaces.msg import HMAutoDockState
+from robot_interfaces.msg import HMAutoDockTrigger
 
 class HmBaseNode(Node):
     def __init__(self):
@@ -29,8 +32,23 @@ class HmBaseNode(Node):
             self.handle_cmd_vel,
             10
         )
+        self.subscription = self.create_subscription(
+            HMAutoDockTrigger,
+            '/hm_auto_dock_trigger',
+            self.handle_hm_auto_dock,
+            10
+        )
+
+        # New publisher for /hm_dock_state
+        self.dock_state_publisher = self.create_publisher(
+            UInt8,
+            '/hm_dock_state',
+            10
+        )
+
         self.get_logger().info("Node initialized")
 
+    #处理cmd_vel
     def handle_cmd_vel(self, msg):
         """处理速度命令的回调函数"""
         try:
@@ -47,12 +65,22 @@ class HmBaseNode(Node):
                 action_code = 2
             elif linear_action == 0 and angular_action < 0:
                 action_code = 1
-            self.send_serial_frame(action_code)
+            self.send_speed_approximately(action_code)
         except ValueError as e:
-            self.get_logger().warn(f"Invalid action value: {e}")
+            self.get_logger().warn(f"Invalid value: {e}")
+    
+    #处理hm_auto_dock
+    def handle_hm_auto_dock(self, msg):
+        """处理"""
+        try:
+            # 消息提取
+            self.get_logger().info("---handle_hm_auto_dock---")
+            action_code = msg.action
+            self.send_hm_auto_dock(action_code)
+        except ValueError as e:
+            self.get_logger().warn(f"Invalid value: {e}")
 
-    def send_serial_frame(self, action_value):
-        # self.get_logger().info("---send_serial_frame, action_value: %d" % action_value)
+    def send_speed_approximately(self, action_value):
         """构建并发送数据帧"""
         try:
             # 校验动作值范围
@@ -76,10 +104,74 @@ class HmBaseNode(Node):
 
             # 发送数据
             self.ser.write(frame)
-            self.get_logger().info(f"Sent frame with action: 0x{action_value:02X}")
+            self.get_logger().info(f"Sent frame with speed_approximately: 0x{action_value:02X}")
 
         except Exception as e:
-            self.get_logger().error(f"Frame sending failed: {str(e)}")
+            self.get_logger().error(f"Frame with speed_approximately sending failed: {str(e)}")
+    
+    def send_hm_auto_dock(self, action_value):
+        """构建并发送数据帧"""
+        try:
+            # 校验动作值范围
+            if not (0 <= action_value <= 255):
+                raise ValueError("Action value out of range (0-255)")
+
+            # 构建数据帧
+            frame = bytes()
+            # 帧头
+            frame += struct.pack('BB', 0xAA, 0x55)
+            # 帧长（固定值）
+            frame += struct.pack('BB', 0x00, 0x04)
+            # 命令码 + 流水号
+            frame += struct.pack('BB', 0x27, 0x00)
+            # 命令
+            frame += struct.pack('B', action_value)
+            # 帧尾
+            frame += struct.pack('B', 0x88)
+
+            # 发送数据
+            self.ser.write(frame)
+            self.get_logger().info(f"Sent frame with hm_auto_dock: 0x{action_value:02X}")
+
+        except Exception as e:
+            self.get_logger().error(f"Frame with hm_auto_dock sending failed: {str(e)}")
+    
+
+    def read_serial_data(self):
+        """读取串口数据并处理"""
+        while rclpy.ok():
+            # self.get_logger().info(f"----read_serial_data----")
+            if self.ser.in_waiting > 0:
+                # 读取帧头
+                header = self.ser.read(2)
+                if header == b'\xAA\x55':
+                    self.get_logger().info(f"--------------read_serial_data--Have read header----------------")
+                    # 读取帧长
+                    frame_length = self.ser.read(2)
+                    if frame_length == b'\x00\x04':
+                        # 读取命令码、流水号、系列编号、返回结果
+                        data = self.ser.read(4)
+                        if len(data) == 4:
+                            command_code, sequence_number, series_number, result = struct.unpack('BBBB', data)
+                            if command_code == 0x27 and sequence_number == 0x00 and series_number == 0x02:
+                                # 读取帧尾
+                                footer = self.ser.read(1)
+                                if footer == b'\x88':
+                                    # 发布返回结果到 /hm_dock_state
+                                    msg = UInt8()
+                                    msg.data = result
+                                    self.dock_state_publisher.publish(msg)
+                                    self.get_logger().info(f"Received dock state: {result}")
+                                else:
+                                    self.get_logger().warn("Invalid frame footer")
+                            else:
+                                self.get_logger().warn("Invalid command code or series number")
+                        else:
+                            self.get_logger().warn("Incomplete data frame")
+                    else:
+                        self.get_logger().warn("Invalid frame length")
+                else:
+                    self.get_logger().warn("Invalid frame header")
 
     def __del__(self):
         """析构时关闭串口"""
@@ -90,6 +182,12 @@ def main(args=None):
     rclpy.init(args=args)
     node = HmBaseNode()
     try:
+        # Start reading serial data in a separate thread
+        import threading
+        serial_thread = threading.Thread(target=node.read_serial_data)
+        serial_thread.daemon = True
+        serial_thread.start()
+
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
