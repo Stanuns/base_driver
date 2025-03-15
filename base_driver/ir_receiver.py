@@ -25,7 +25,7 @@ class IRReceiverNode(Node):
         self.publisher_ = self.create_publisher(DockInfraRed, '/dock_ir', 10)
 
         # 多串口
-        self.ports = ["/dev/ttyUSB0","/dev/ttyUSB1", "/dev/ttyUSB2"] #, "/dev/ttyUSB1", "/dev/ttyUSB2"
+        self.ports = ["/dev/ttyUSB0","/dev/ttyUSB1", "/dev/ttyUSB2"] #"/dev/ir_receiver_1","/dev/ir_receiver_2", "/dev/ir_receiver_3"
         self.serial_instances = []
 
         # 初始化串口
