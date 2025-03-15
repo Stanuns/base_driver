@@ -26,6 +26,19 @@ class HmBaseNode(Node):
             self.get_logger().error("Failed to open serial port!")
             raise Exception("Serial port open failed")
 
+        # 初始化第二个串口连接
+        self.ser_android = serial.Serial(
+            port='/dev/ttyUSB1',
+            baudrate=115200,
+            bytesize=serial.EIGHTBITS,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            timeout=1
+        )
+        if not self.ser_android.is_open:
+            self.get_logger().error("Failed to open android serial port!")
+            raise Exception("Android serial port open failed")
+
         self.subscription = self.create_subscription(
             Twist,
             '/cmd_vel',
@@ -43,6 +56,13 @@ class HmBaseNode(Node):
         self.dock_state_publisher = self.create_publisher(
             UInt8,
             '/hm_dock_state',
+            10
+        )
+
+        # New publisher for /android_voice_action
+        self.android_voice_action_publisher = self.create_publisher(
+            UInt8,
+            '/android_voice_action',
             10
         )
 
@@ -136,7 +156,6 @@ class HmBaseNode(Node):
         except Exception as e:
             self.get_logger().error(f"Frame with hm_auto_dock sending failed: {str(e)}")
     
-
     def read_serial_data(self):
         """读取串口数据并处理"""
         while rclpy.ok():
@@ -173,10 +192,47 @@ class HmBaseNode(Node):
                 else:
                     self.get_logger().warn("Invalid frame header")
 
+    def read_android_serial_data(self):
+        """读取android串口数据并处理"""
+        while rclpy.ok():
+            if self.ser_android.in_waiting > 0:
+                # 读取帧头
+                header = self.ser_android.read(2)
+                if header == b'\xAA\x55':
+                    self.get_logger().info(f"--------------read_android_serial_data--Have read header----------------")
+                    # 读取帧长
+                    frame_length = self.ser_android.read(2)
+                    if frame_length == b'\x00\x07':
+                        # 读取命令码、流水号、系列编号、动作值、运动时间
+                        data = self.ser_android.read(6)
+                        if len(data) == 6:
+                            command_code, sequence_number, series_number, action_value, motion_time = struct.unpack('BBBBH', data)
+                            if command_code == 0x22 and sequence_number == 0x00 and series_number == 0x01:
+                                # 读取帧尾
+                                footer = self.ser_android.read(1)
+                                if footer == b'\x88':
+                                    # 发布动作值到 /android_voice_action
+                                    msg = UInt8()
+                                    msg.data = action_value
+                                    self.android_voice_action_publisher.publish(msg)
+                                    self.get_logger().info(f"Received android voice action: {action_value}")
+                                else:
+                                    self.get_logger().warn("Invalid frame footer")
+                            else:
+                                self.get_logger().warn("Invalid command code or series number")
+                        else:
+                            self.get_logger().warn("Incomplete data frame")
+                    else:
+                        self.get_logger().warn("Invalid frame length")
+                else:
+                    self.get_logger().warn("Invalid frame header")
+
     def __del__(self):
         """析构时关闭串口"""
         if hasattr(self, 'ser') and self.ser.is_open:
             self.ser.close()
+        if hasattr(self, 'ser_android') and self.ser_android.is_open:
+            self.ser_android.close()
 
 def main(args=None):
     rclpy.init(args=args)
@@ -187,6 +243,11 @@ def main(args=None):
         serial_thread = threading.Thread(target=node.read_serial_data)
         serial_thread.daemon = True
         serial_thread.start()
+
+        # Start reading android serial data in a separate thread
+        android_serial_thread = threading.Thread(target=node.read_android_serial_data)
+        android_serial_thread.daemon = True
+        android_serial_thread.start()
 
         rclpy.spin(node)
     except KeyboardInterrupt:
