@@ -125,10 +125,10 @@ class HmBaseNode(Node):
 
             # 发送数据
             self.ser.write(frame)
-            self.get_logger().info(f"Sent frame with speed_approximately: 0x{action_value:02X}")
+            self.get_logger().info(f"Sent speed_approximately frame to base : 0x{action_value:02X}")
 
         except Exception as e:
-            self.get_logger().error(f"Frame with speed_approximately sending failed: {str(e)}")
+            self.get_logger().error(f"Speed_approximately Frame sending to base failed: {str(e)}")
     
     def send_hm_auto_dock(self, action_value):
         """构建并发送数据帧"""
@@ -152,20 +152,20 @@ class HmBaseNode(Node):
 
             # 发送数据
             self.ser.write(frame)
-            self.get_logger().info(f"Sent frame with hm_auto_dock: 0x{action_value:02X}")
+            self.get_logger().info(f"Sent hm_auto_dock frame to base: 0x{action_value:02X}")
 
         except Exception as e:
-            self.get_logger().error(f"Frame with hm_auto_dock sending failed: {str(e)}")
+            self.get_logger().error(f"Hm_auto_dock Frame sending to base failed: {str(e)}")
     
-    def read_serial_data(self):
+    def read_base_serial_data(self):
         """读取串口数据并处理"""
         while rclpy.ok():
-            # self.get_logger().info(f"----read_serial_data----")
+            # self.get_logger().info(f"----read_base_serial_data----")
             if self.ser.in_waiting > 0:
                 # 读取帧头
                 header = self.ser.read(2)
                 if header == b'\xAA\x55':
-                    self.get_logger().info(f"--------------read_serial_data--Have read header----------------")
+                    self.get_logger().info(f"--------------read_base_serial_data--Have read header----------------")
                     # 读取帧长
                     frame_length = self.ser.read(2)
                     if frame_length == b'\x00\x04':
@@ -249,7 +249,7 @@ class HmBaseNode(Node):
                                     for i in range(1,3):
                                         self.send_hm_auto_dock(command)
                                         time.sleep(0.02)
-                                    self.get_logger().info(f"Received android voice action | send_hm_auto_dock: {action_value}")
+                                    self.get_logger().info(f"Received android voice action | send_hm_auto_dock: {command}")
                                 else:
                                     self.get_logger().warn("Invalid frame footer | send_hm_auto_dock")
                             else:
@@ -275,7 +275,7 @@ def main(args=None):
     try:
         # Start reading serial data in a separate thread
         import threading
-        serial_thread = threading.Thread(target=node.read_serial_data)
+        serial_thread = threading.Thread(target=node.read_base_serial_data)
         serial_thread.daemon = True
         serial_thread.start()
 
