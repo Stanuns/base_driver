@@ -29,7 +29,7 @@ class HmBaseNode(Node):
 
         # 初始化Android串口连接
         self.ser_android = serial.Serial(
-            port='/dev/hm_andorid',
+            port='/dev/hm_android',
             baudrate=115200,
             bytesize=serial.EIGHTBITS,
             parity=serial.PARITY_NONE,
