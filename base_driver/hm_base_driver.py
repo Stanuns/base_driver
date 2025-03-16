@@ -16,7 +16,7 @@ class HmBaseNode(Node):
         
         # 初始下位机串口连接
         self.ser = serial.Serial(
-            port='/dev/ttyUSB0',
+            port='/dev/hm_base',
             baudrate=115200,
             bytesize=serial.EIGHTBITS,
             parity=serial.PARITY_NONE,
@@ -29,7 +29,7 @@ class HmBaseNode(Node):
 
         # 初始化Android串口连接
         self.ser_android = serial.Serial(
-            port='/dev/ttyUSB1',
+            port='/dev/hm_andorid',
             baudrate=115200,
             bytesize=serial.EIGHTBITS,
             parity=serial.PARITY_NONE,
