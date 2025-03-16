@@ -3,7 +3,7 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-from std_msgs.msg import UInt8  # New import for the new topic
+from std_msgs.msg import UInt8
 import serial
 import struct
 from robot_interfaces.msg import HMAutoDockState
@@ -14,7 +14,7 @@ class HmBaseNode(Node):
     def __init__(self):
         super().__init__('hm_serial_node')
         
-        # 初始下位机串口连接
+        # 初始化下位机串口连接
         self.ser = serial.Serial(
             port='/dev/hm_base',
             baudrate=115200,
