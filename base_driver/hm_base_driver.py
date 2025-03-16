@@ -8,12 +8,13 @@ import serial
 import struct
 from robot_interfaces.msg import HMAutoDockState
 from robot_interfaces.msg import HMAutoDockTrigger
+import time
 
 class HmBaseNode(Node):
     def __init__(self):
         super().__init__('hm_serial_node')
         
-        # 初始化串口连接
+        # 初始下位机串口连接
         self.ser = serial.Serial(
             port='/dev/ttyUSB0',
             baudrate=115200,
@@ -26,7 +27,7 @@ class HmBaseNode(Node):
             self.get_logger().error("Failed to open serial port!")
             raise Exception("Serial port open failed")
 
-        # 初始化第二个串口连接
+        # 初始化Android串口连接
         self.ser_android = serial.Serial(
             port='/dev/ttyUSB1',
             baudrate=115200,
@@ -45,7 +46,7 @@ class HmBaseNode(Node):
             self.handle_cmd_vel,
             10
         )
-        self.subscription = self.create_subscription(
+        self.subscription2 = self.create_subscription(
             HMAutoDockTrigger,
             '/hm_auto_dock_trigger',
             self.handle_hm_auto_dock,
@@ -202,6 +203,8 @@ class HmBaseNode(Node):
                     self.get_logger().info(f"--------------read_android_serial_data--Have read header----------------")
                     # 读取帧长
                     frame_length = self.ser_android.read(2)
+
+                    #模糊运动控制
                     if frame_length == b'\x00\x07':
                         # 读取命令码、流水号、系列编号、动作值、运动时间
                         data = self.ser_android.read(6)
@@ -215,17 +218,49 @@ class HmBaseNode(Node):
                                     msg = UInt8()
                                     msg.data = action_value
                                     self.android_voice_action_publisher.publish(msg)
-                                    self.get_logger().info(f"Received android voice action: {action_value}")
+                                    # 写入android语音识别的数据到写入下位机串口
+                                    # 重复写防止下位机没有反应
+                                    for i in range(1,3):
+                                        self.send_speed_approximately(action_value)
+                                        time.sleep(0.02)
+                                    self.get_logger().info(f"Received android voice action | send_speed_approximately: {action_value}")
                                 else:
-                                    self.get_logger().warn("Invalid frame footer")
+                                    self.get_logger().warn("Invalid frame footer | send_speed_approximately")
                             else:
-                                self.get_logger().warn("Invalid command code or series number")
+                                self.get_logger().warn("Invalid command code or series number | send_speed_approximately")
                         else:
-                            self.get_logger().warn("Incomplete data frame")
+                            self.get_logger().warn("Incomplete data frame | send_speed_approximately")
+
+                    #回充启停控制
+                    elif frame_length == b'\x00\x04':
+                        data = self.ser_android.read(3)
+                        if len(data) == 3:
+                            command_code, sequence_number, command = struct.unpack('BBB', data)
+                            if command_code == 0x27 and sequence_number == 0x00 :
+                                # 读取帧尾
+                                footer = self.ser_android.read(1)
+                                if footer == b'\x88':
+                                    # 发布动作值到 /android_voice_action
+                                    msg = UInt8()
+                                    msg.data = command
+                                    self.android_voice_action_publisher.publish(msg)
+                                    # 写入android语音识别的数据到写入下位机串口
+                                    # 重复写防止下位机没有反应
+                                    for i in range(1,3):
+                                        self.send_hm_auto_dock(command)
+                                        time.sleep(0.02)
+                                    self.get_logger().info(f"Received android voice action | send_hm_auto_dock: {action_value}")
+                                else:
+                                    self.get_logger().warn("Invalid frame footer | send_hm_auto_dock")
+                            else:
+                                self.get_logger().warn("Invalid command code or series number | send_hm_auto_dock")
+                        else:
+                            self.get_logger().warn("Incomplete data frame | send_hm_auto_dock")
+
                     else:
-                        self.get_logger().warn("Invalid frame length")
+                        self.get_logger().warn("Read Android Invalid frame length")
                 else:
-                    self.get_logger().warn("Invalid frame header")
+                    self.get_logger().warn("Read Android Invalid frame header")
 
     def __del__(self):
         """析构时关闭串口"""
