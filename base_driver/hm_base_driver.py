@@ -9,13 +9,17 @@ import struct
 from robot_interfaces.msg import HMAutoDockState
 from robot_interfaces.msg import HMAutoDockTrigger
 import time
+import traceback
 
 class HmBaseNode(Node):
     def __init__(self):
         super().__init__('hm_serial_node')
         
+        self.control_data_head = b'\xAA\x55'
+        self.control_data_foot = b'\x88'
+
         # 初始化下位机串口连接
-        self.ser = serial.Serial(
+        self.ser_base = serial.Serial(
             port='/dev/hm_base',
             baudrate=115200,
             bytesize=serial.EIGHTBITS,
@@ -23,7 +27,7 @@ class HmBaseNode(Node):
             stopbits=serial.STOPBITS_ONE,
             timeout=1
         )
-        if not self.ser.is_open:
+        if not self.ser_base.is_open:
             self.get_logger().error("Failed to open serial port!")
             raise Exception("Serial port open failed")
 
@@ -42,8 +46,8 @@ class HmBaseNode(Node):
 
         self.subscription = self.create_subscription(
             Twist,
-            '/cmd_vel',
-            self.handle_cmd_vel,
+            '/hm_cmd_vel',
+            self.handle_hm_cmd_vel,
             10
         )
         self.subscription2 = self.create_subscription(
@@ -70,11 +74,11 @@ class HmBaseNode(Node):
         self.get_logger().info("Node initialized")
 
     #处理cmd_vel
-    def handle_cmd_vel(self, msg):
+    def handle_hm_cmd_vel(self, msg):
         """处理速度命令的回调函数"""
         try:
             # 消息提取
-            self.get_logger().info("---handle_cmd_vel---")
+            self.get_logger().info("---handle_hm_cmd_vel---")
             linear_action = msg.linear.x
             angular_action = msg.angular.z
             action_code = 0x00
@@ -101,6 +105,7 @@ class HmBaseNode(Node):
         except ValueError as e:
             self.get_logger().warn(f"Invalid value: {e}")
 
+    ####################################控制信息发送至底盘下位机#############################################
     def send_speed_approximately(self, action_value):
         """构建并发送数据帧"""
         try:
@@ -110,8 +115,6 @@ class HmBaseNode(Node):
 
             # 构建数据帧
             frame = bytes()
-            # 帧头
-            frame += struct.pack('BB', 0xAA, 0x55)
             # 帧长（固定值）
             frame += struct.pack('BB', 0x00, 0x07)
             # 命令码 + 流水号
@@ -120,11 +123,9 @@ class HmBaseNode(Node):
             frame += struct.pack('BB', 0x01, action_value)
             # 运动时间（小端模式 0x0320 = 800ms）
             frame += struct.pack('<H', 800)  # 小端模式打包
-            # 帧尾
-            frame += struct.pack('B', 0x88)
 
             # 发送数据
-            self.ser.write(frame)
+            self._send_data_frame(frame)
             self.get_logger().info(f"Sent speed_approximately frame to base : 0x{action_value:02X}")
 
         except Exception as e:
@@ -139,43 +140,80 @@ class HmBaseNode(Node):
 
             # 构建数据帧
             frame = bytes()
-            # 帧头
-            frame += struct.pack('BB', 0xAA, 0x55)
             # 帧长（固定值）
             frame += struct.pack('BB', 0x00, 0x04)
             # 命令码 + 流水号
             frame += struct.pack('BB', 0x27, 0x00)
             # 命令
             frame += struct.pack('B', action_value)
-            # 帧尾
-            frame += struct.pack('B', 0x88)
 
             # 发送数据
-            self.ser.write(frame)
+            self._send_data_frame(frame)
             self.get_logger().info(f"Sent hm_auto_dock frame to base: 0x{action_value:02X}")
 
         except Exception as e:
             self.get_logger().error(f"Hm_auto_dock Frame sending to base failed: {str(e)}")
+
+    def send_speed(self, left_speed, right_speed):
+        if left_speed >= 0:
+            left_dir = b'\x01'
+        else:
+            left_dir = b'\x00'
+        if right_speed >= 0:
+            right_dir = b'\x01'
+        else:
+            right_dir = b'\x00'
+        sleft = abs(left_speed)
+        sright = abs(right_speed)
+
+        # 构建数据帧
+        frame = bytes()
+        # 帧长（固定值）
+        frame += struct.pack('BB', 0x00, 0x09)
+        # 命令码 + 流水号
+        frame += struct.pack('BB', 0x77, 0x00)
+        # 左右轮速度及方向
+        frame += struct.pack('<H', sleft)
+        frame += struct.pack('<H', sright)
+        frame += (left_dir + right_dir)
+
+        self._send_data_frame(frame)
+        self.get_logger().info(f"Sent wheel speed frame to base")
+
+    def _send_data_frame(self, data_tob_send): 
+        control_data = self.control_data_head + data_tob_send + self.control_data_foot 
+        try: 
+            self.ser_base.write(control_data)     
+        except serial.SerialTimeoutException as e:
+            self.get_logger().error(f"write time out, so flush the output: {str(e)}")
+            self.ser_base.flushOutput()
+        except serial.SerialException as e:
+            self.get_logger().error(f"Serial Port may disconnected, try to reopen the port. error: {str(e)}")
+            traceback.print_exc()
+            return None 
     
+    ####################################读取底盘下位机返回信息##############################################
     def read_base_serial_data(self):
         """读取串口数据并处理"""
         while rclpy.ok():
             # self.get_logger().info(f"----read_base_serial_data----")
-            if self.ser.in_waiting > 0:
+            if self.ser_base.in_waiting > 0:
                 # 读取帧头
-                header = self.ser.read(2)
+                header = self.ser_base.read(2)
+
+                # 读取回充状态
                 if header == b'\xAA\x55':
                     self.get_logger().info(f"--------------read_base_serial_data--Have read header----------------")
                     # 读取帧长
-                    frame_length = self.ser.read(2)
+                    frame_length = self.ser_base.read(2)
                     if frame_length == b'\x00\x04':
                         # 读取命令码、流水号、系列编号、返回结果
-                        data = self.ser.read(4)
+                        data = self.ser_base.read(4)
                         if len(data) == 4:
                             command_code, sequence_number, series_number, result = struct.unpack('BBBB', data)
                             if command_code == 0x27 and sequence_number == 0x00 and series_number == 0x02:
                                 # 读取帧尾
-                                footer = self.ser.read(1)
+                                footer = self.ser_base.read(1)
                                 if footer == b'\x88':
                                     # 发布返回结果到 /hm_dock_state
                                     msg = UInt8()
@@ -193,6 +231,7 @@ class HmBaseNode(Node):
                 else:
                     self.get_logger().warn("Invalid frame header")
 
+    ####################################读取Android pad返回信息##############################################
     def read_android_serial_data(self):
         """读取android串口数据并处理"""
         while rclpy.ok():
@@ -264,8 +303,8 @@ class HmBaseNode(Node):
 
     def __del__(self):
         """析构时关闭串口"""
-        if hasattr(self, 'ser') and self.ser.is_open:
-            self.ser.close()
+        if hasattr(self, 'ser_base') and self.ser_base.is_open:
+            self.ser_base.close()
         if hasattr(self, 'ser_android') and self.ser_android.is_open:
             self.ser_android.close()
 
