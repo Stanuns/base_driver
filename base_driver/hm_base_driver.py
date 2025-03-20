@@ -93,17 +93,19 @@ class HmBaseNode(Node):
         try:
             # 消息提取
             self.get_logger().info("---handle_hm_cmd_vel---")
-            linear_action = msg.linear.x
-            angular_action = msg.angular.z
+            linear_velocity = msg.linear.x
+            angular_velocity = msg.angular.z
             action_code = 0x00
-            if linear_action > 0 and angular_action == 0:
+            if linear_velocity > 0.025 and abs(angular_velocity) < 0.05:
                 action_code = 4
-            elif linear_action < 0 and angular_action == 0:
+            elif linear_velocity < -0.025 and abs(angular_velocity) < 0.05:
                 action_code = 3
-            elif linear_action == 0 and angular_action > 0:
+            elif abs(linear_velocity) < 0.025 and angular_velocity > 0.05:
                 action_code = 2
-            elif linear_action == 0 and angular_action < 0:
+            elif abs(linear_velocity) < 0.025 and angular_velocity < -0.05:
                 action_code = 1
+            elif abs(linear_velocity) <= 0.025 and abs(angular_velocity) <= 0.05:
+                action_code = 0
             self.send_speed_approximately(action_code)
         except ValueError as e:
             self.get_logger().warn(f"Invalid value: {e}")
@@ -136,7 +138,7 @@ class HmBaseNode(Node):
             # 系列编号 + 动作值
             frame += struct.pack('BB', 0x01, action_value)
             # 运动时间（小端模式 0x0320 = 800ms）
-            frame += struct.pack('<H', 800)  # 小端模式打包
+            frame += struct.pack('<H', 200)  # 小端模式打包
 
             # 发送数据
             self._send_data_frame(frame)
@@ -210,77 +212,78 @@ class HmBaseNode(Node):
     def read_base_serial_data(self):
         """读取串口数据并处理"""
         while rclpy.ok():
-            self.get_logger().info(f"----read_base_serial_data--1--")
-            if self.ser_base.in_waiting > 0:
-                # self.get_logger().info(f"----read_base_serial_data--2--")
-                # 读取帧头
-                # header = self.ser_base.read(2)
-                header = self.ser_base.read_until(b'\xAA\x55') #会有超时时间，超时返回None
+            # # self.get_logger().info(f"----read_base_serial_data--1--")
+            # if self.ser_base.in_waiting > 0:
+            #     # self.get_logger().info(f"----read_base_serial_data--2--")
+            #     # 读取帧头
+            #     # header = self.ser_base.read(2)
+            #     header = self.ser_base.read_until(b'\xAA\x55') #会有超时时间，超时返回None
 
-                if header[-2:] == b'\xAA\x55':
-                    self.get_logger().info(f"--------------read_base_serial_data--Have read header----------------")
+            #     if header[-2:] == b'\xAA\x55':
+            #         self.get_logger().info(f"--------------read_base_serial_data--Have read header----------------")
                     
-                    ## 读取回充状态
-                    # 读取帧长
-                    frame_length = self.ser_base.read(2)
-                    if frame_length == b'\x00\x04':
-                        # 读取命令码、流水号、系列编号、返回结果
-                        data = self.ser_base.read(4)
-                        if len(data) == 4:
-                            command_code, sequence_number, series_number, result = struct.unpack('BBBB', data)
-                            if command_code == 0x27 and sequence_number == 0x00 and series_number == 0x02:
-                                # 读取帧尾
-                                footer = self.ser_base.read(1)
-                                if footer == b'\x88':
-                                    # 发布返回结果到 /hm_dock_state
-                                    msg = HMAutoDockState()
-                                    msg.state = result
-                                    self.dock_state_publisher.publish(msg)
-                                    self.get_logger().info(f"Received dock state: {result}")
-                                else:
-                                    self.get_logger().warn("Invalid frame footer")
-                            else:
-                                self.get_logger().warn("Invalid command code or series number")
-                        else:
-                            self.get_logger().warn("Incomplete data frame")
-                    ## 读取odom
-                    elif frame_length == b'\x00\x17':
-                        # self.get_logger().info("Received odom")
-                        data = self.ser_base.read(2)
-                        command_code, sequence_number= struct.unpack('BB', data)
-                        self.get_logger().info(f"Received odom, command_code:{command_code}")
+            #         ## 读取回充状态
+            #         # 读取帧长
+            #         frame_length = self.ser_base.read(2)
+            #         if frame_length == b'\x00\x04':
+            #             # 读取命令码、流水号、系列编号、返回结果
+            #             data = self.ser_base.read(4)
+            #             if len(data) == 4:
+            #                 command_code, sequence_number, series_number, result = struct.unpack('BBBB', data)
+            #                 if command_code == 0x27 and sequence_number == 0x00 and series_number == 0x02:
+            #                     # 读取帧尾
+            #                     footer = self.ser_base.read(1)
+            #                     if footer == b'\x88':
+            #                         # 发布返回结果到 /hm_dock_state
+            #                         msg = HMAutoDockState()
+            #                         msg.state = result
+            #                         self.dock_state_publisher.publish(msg)
+            #                         self.get_logger().info(f"Received dock state: {result}")
+            #                     else:
+            #                         self.get_logger().warn("Invalid frame footer")
+            #                 else:
+            #                     self.get_logger().warn("Invalid command code or series number")
+            #             else:
+            #                 self.get_logger().warn("Incomplete data frame")
 
-                    else:
-                        self.get_logger().warn("Invalid frame length")
-                else:
-                    self.get_logger().warn("Invalid frame header")
+            #         ## 读取odom
+            #         elif frame_length == b'\x00\x17':
+            #             # self.get_logger().info("Received odom")
+            #             data = self.ser_base.read(2)
+            #             command_code, sequence_number= struct.unpack('BB', data)
+            #             self.get_logger().info(f"Received odom, command_code:{command_code}")
+
+            #         else:
+            #             self.get_logger().warn("Invalid frame length")
+            #     else:
+            #         self.get_logger().warn("Invalid frame header")
             
             # time.sleep(0.005)
 
-            # data = self.get_base_new_data()
-            # if data is None:
-            #     pass
-            #     return
-            # income_data_type = data.get('type')
-            # if income_data_type == 'odom':
-            #     self.cast_odom(data)
-            # elif quaternion_from_euler =='auto_dock':
-            #     self.cast_dock_state(data)
-            # else: 
-            #     pass
-            #     return
+            data = self.get_base_new_data()
+            if data is None:
+                pass
+                return
+            income_data_type = data.get('type')
+            if income_data_type == 'odom':
+                self.cast_odom(data)
+            elif quaternion_from_euler =='auto_dock':
+                self.cast_dock_state(data)
+            else: 
+                pass
+                return
 
     def get_base_new_data(self):
         try:
             frame = self.read_base_raw_frame()
             code = frame.get('code')
-            data_in_frame = frame.get('data')
-            if code == 78: #odom
+            data_in_frame = frame.get('data_raw')
+            if code == 120: #odom
                 return self._case_odom(data_in_frame)
-            elif code == 27: #回充反馈
+            elif code == 39: #回充反馈
                 return self._case_auto_dock(data_in_frame)
             else:
-                self.get_logger().warn(f"Unknown code received: {code}")
+                self.get_logger().warn(f"Unknown code_raw received: {code}")
                 return None
         except BaseSerialError as e:
             self.get_logger().error(f"Read serial time out. {str(e.message)}")
@@ -294,7 +297,7 @@ class HmBaseNode(Node):
         header = self.ser_base.read_until(b'\xAA\x55')
             # header = self.ser_base.read(2)
         
-        if (len(header) != 2) or (header[-2:] != b'\xAA\x55'):
+        if (len(header) >= 2) and (header[-2:] != b'\xAA\x55'):
             e.message = 'Frame corrupted, head can not be reached in time.'
             raise e
         
@@ -321,7 +324,7 @@ class HmBaseNode(Node):
             raise e
 
         #fix bugs from 华麦
-        if code == 27:
+        if code == 39:
             data_raw =  self.ser_base.read(data_len-2) #帧长值华麦从底盘上传错误
         else:
             data_raw =  self.ser_base.read(data_len-3) #帧长-1命令码-1流水号-1帧尾
@@ -331,10 +334,11 @@ class HmBaseNode(Node):
             e.message = 'No footer'
             raise e
 
-        frame['data'] = data_raw  # bytes
+        frame['data_raw'] = data_raw  # bytes
         frame['code'] = code  # int
         return frame
-
+    
+    @staticmethod
     def _case_odom(data_raw): 
         if len(data_raw) != 20:  # refer to the data sheet provided by jinfei
             e = BaseSerialError()
@@ -348,6 +352,7 @@ class HmBaseNode(Node):
         data['v'] = v
         data['w'] = w 
         return data
+    @staticmethod
     def _case_auto_dock(data_raw):
         if len(data_raw) != 2:  # refer to the data sheet provided by jinfei
             e = BaseSerialError()
