@@ -109,41 +109,17 @@ class HmBaseNode(Node):
                 action_code = 1
                 self.send_speed_approximately(action_code)
             elif linear_velocity > 0.025 and angular_velocity > 0.05: #前进 逆时针
-                action_code = 4
-                for i in range(4):
-                    self.send_speed_approximately(action_code)
-                    # time.sleep(0.1)
                 action_code = 2
-                for i in range(4):
-                    self.send_speed_approximately(action_code)
-                    # time.sleep(0.2)
+                self.send_speed_approximately(action_code)
             elif linear_velocity > 0.025 and angular_velocity < -0.05: #前进 顺时针
-                action_code = 4
-                for i in range(3):
-                    self.send_speed_approximately(action_code)
-                    time.sleep(0.2)
                 action_code = 1
-                for i in range(3):
-                    self.send_speed_approximately(action_code)
-                    time.sleep(0.2)
+                self.send_speed_approximately(action_code)
             elif linear_velocity < -0.025 and angular_velocity > 0.05: #后退 逆时针
-                action_code = 3
-                for i in range(3):
-                    self.send_speed_approximately(action_code)
-                    time.sleep(0.2)
                 action_code = 2
-                for i in range(3):
-                    self.send_speed_approximately(action_code)
-                    time.sleep(0.2)
+                self.send_speed_approximately(action_code)
             elif linear_velocity < -0.025 and angular_velocity < -0.05: #后退 顺时针
-                action_code = 3
-                for i in range(3):
-                    self.send_speed_approximately(action_code)
-                    time.sleep(0.2)
                 action_code = 1
-                for i in range(3):
-                    self.send_speed_approximately(action_code)
-                    time.sleep(0.2)
+                self.send_speed_approximately(action_code)
             elif abs(linear_velocity) <= 0.025 and abs(angular_velocity) <= 0.05:
                 action_code = 0
                 self.send_speed_approximately(action_code)
