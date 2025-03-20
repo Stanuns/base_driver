@@ -267,7 +267,7 @@ class HmBaseNode(Node):
             income_data_type = data.get('type')
             if income_data_type == 'odom':
                 self.cast_odom(data)
-            elif quaternion_from_euler =='auto_dock':
+            elif income_data_type =='auto_dock':
                 self.cast_dock_state(data)
             else: 
                 pass
