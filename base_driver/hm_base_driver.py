@@ -319,15 +319,16 @@ class HmBaseNode(Node):
             data = self.get_base_new_data()
             if data is None:
                 pass
-                return
-            income_data_type = data.get('type')
-            if income_data_type == 'odom':
-                self.cast_odom(data)
-            elif income_data_type =='auto_dock':
-                self.cast_dock_state(data)
-            else: 
-                pass
-                return
+                # return
+            else:
+                income_data_type = data.get('type')
+                if income_data_type == 'odom':
+                    self.cast_odom(data)
+                elif income_data_type =='auto_dock':
+                    self.cast_dock_state(data)
+                else: 
+                    pass
+                    return
 
     def get_base_new_data(self):
         try:
