@@ -12,6 +12,7 @@ from robot_interfaces.msg import HMAutoDockTrigger
 import time
 import traceback
 from tf_transformations import quaternion_from_euler
+import covariances
 
 class BaseSerialError(Exception):
     def __init__(self, message=""):
@@ -435,6 +436,13 @@ class HmBaseNode(Node):
         msg.pose.pose.orientation.w = quaternion[3]
         msg.twist.twist.linear.x = v
         msg.twist.twist.angular.z = w
+        if msg.twist.twist.linear.x == 0 and msg.twist.twist.angular.z == 0:
+            msg.twist.covariance = covariances.ODOM_TWIST_COVARIANCE2
+            msg.pose.covariance = covariances.ODOM_POSE_COVARIANCE2
+        else:
+            msg.twist.covariance = covariances.ODOM_TWIST_COVARIANCE
+            msg.pose.covariance = covariances.ODOM_POSE_COVARIANCE
+
         self.odom_publisher.publish(msg)
     
     def cast_dock_state(self, data):
