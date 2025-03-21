@@ -27,7 +27,7 @@ class HmBaseNode(Node):
 
         # 初始化下位机串口连接
         self.ser_base = serial.Serial(
-            port='/dev/ttyUSB0',
+            port='/dev/hm_base',
             baudrate=115200,
             bytesize=serial.EIGHTBITS,
             parity=serial.PARITY_NONE,
@@ -38,18 +38,18 @@ class HmBaseNode(Node):
             self.get_logger().error("Failed to open serial port!")
             raise Exception("Serial port open failed")
 
-        # # 初始化Android串口连接
-        # self.ser_android = serial.Serial(
-        #     port='/dev/hm_android',
-        #     baudrate=115200,
-        #     bytesize=serial.EIGHTBITS,
-        #     parity=serial.PARITY_NONE,
-        #     stopbits=serial.STOPBITS_ONE,
-        #     timeout=1
-        # )
-        # if not self.ser_android.is_open:
-        #     self.get_logger().error("Failed to open android serial port!")
-        #     raise Exception("Android serial port open failed")
+        # 初始化Android串口连接
+        self.ser_android = serial.Serial(
+            port='/dev/hm_android',
+            baudrate=115200,
+            bytesize=serial.EIGHTBITS,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            timeout=1
+        )
+        if not self.ser_android.is_open:
+            self.get_logger().error("Failed to open android serial port!")
+            raise Exception("Android serial port open failed")
 
         self.subscription = self.create_subscription(
             Twist,
@@ -413,75 +413,75 @@ class HmBaseNode(Node):
         self.dock_state_publisher.publish(msg)
         
 
-    # ### 读取Android pad返回信息
-    # def read_android_serial_data(self):
-    #     """读取android串口数据并处理"""
-    #     while rclpy.ok():
-    #         if self.ser_android.in_waiting > 0:
-    #             # 读取帧头
-    #             header = self.ser_android.read(2)
-    #             if header == b'\xAA\x55':
-    #                 self.get_logger().info(f"--------------read_android_serial_data--Have read header----------------")
-    #                 # 读取帧长
-    #                 frame_length = self.ser_android.read(2)
+    ### 读取Android pad返回信息
+    def read_android_serial_data(self):
+        """读取android串口数据并处理"""
+        while rclpy.ok():
+            if self.ser_android.in_waiting > 0:
+                # 读取帧头
+                header = self.ser_android.read(2)
+                if header == b'\xAA\x55':
+                    self.get_logger().info(f"--------------read_android_serial_data--Have read header----------------")
+                    # 读取帧长
+                    frame_length = self.ser_android.read(2)
 
-    #                 # 模糊运动控制
-    #                 if frame_length == b'\x00\x07':
-    #                     # 读取命令码、流水号、系列编号、动作值、运动时间
-    #                     data = self.ser_android.read(6)
-    #                     if len(data) == 6:
-    #                         command_code, sequence_number, series_number, action_value, motion_time = struct.unpack('BBBBH', data)
-    #                         if command_code == 0x22 and sequence_number == 0x00 and series_number == 0x01:
-    #                             # 读取帧尾
-    #                             footer = self.ser_android.read(1)
-    #                             if footer == b'\x88':
-    #                                 # 发布动作值到 /android_voice_action
-    #                                 msg = UInt8()
-    #                                 msg.data = action_value
-    #                                 self.android_voice_action_publisher.publish(msg)
-    #                                 # 写入android语音识别的数据到写入下位机串口
-    #                                 # 重复写防止下位机没有反应
-    #                                 for i in range(1,3):
-    #                                     self.send_speed_approximately(action_value)
-    #                                     time.sleep(0.02)
-    #                                 self.get_logger().info(f"Received android voice action | send_speed_approximately: {action_value}")
-    #                             else:
-    #                                 self.get_logger().warn("Invalid frame footer | send_speed_approximately")
-    #                         else:
-    #                             self.get_logger().warn("Invalid command code or series number | send_speed_approximately")
-    #                     else:
-    #                         self.get_logger().warn("Incomplete data frame | send_speed_approximately")
+                    # 模糊运动控制
+                    if frame_length == b'\x00\x07':
+                        # 读取命令码、流水号、系列编号、动作值、运动时间
+                        data = self.ser_android.read(6)
+                        if len(data) == 6:
+                            command_code, sequence_number, series_number, action_value, motion_time = struct.unpack('BBBBH', data)
+                            if command_code == 0x22 and sequence_number == 0x00 and series_number == 0x01:
+                                # 读取帧尾
+                                footer = self.ser_android.read(1)
+                                if footer == b'\x88':
+                                    # 发布动作值到 /android_voice_action
+                                    msg = UInt8()
+                                    msg.data = action_value
+                                    self.android_voice_action_publisher.publish(msg)
+                                    # 写入android语音识别的数据到写入下位机串口
+                                    # 重复写防止下位机没有反应
+                                    for i in range(1,3):
+                                        self.send_speed_approximately(action_value)
+                                        time.sleep(0.02)
+                                    self.get_logger().info(f"Received android voice action | send_speed_approximately: {action_value}")
+                                else:
+                                    self.get_logger().warn("Invalid frame footer | send_speed_approximately")
+                            else:
+                                self.get_logger().warn("Invalid command code or series number | send_speed_approximately")
+                        else:
+                            self.get_logger().warn("Incomplete data frame | send_speed_approximately")
 
-    #                 #回充启停控制
-    #                 elif frame_length == b'\x00\x04':
-    #                     data = self.ser_android.read(3)
-    #                     if len(data) == 3:
-    #                         command_code, sequence_number, command = struct.unpack('BBB', data)
-    #                         if command_code == 0x27 and sequence_number == 0x00 :
-    #                             # 读取帧尾
-    #                             footer = self.ser_android.read(1)
-    #                             if footer == b'\x88':
-    #                                 # 发布动作值到 /android_voice_action
-    #                                 msg = UInt8()
-    #                                 msg.data = command
-    #                                 self.android_voice_action_publisher.publish(msg)
-    #                                 # 写入android语音识别的数据到写入下位机串口
-    #                                 # 重复写防止下位机没有反应
-    #                                 for i in range(1,3):
-    #                                     self.send_hm_auto_dock(command)
-    #                                     time.sleep(0.02)
-    #                                 self.get_logger().info(f"Received android voice action | send_hm_auto_dock: {command}")
-    #                             else:
-    #                                 self.get_logger().warn("Invalid frame footer | send_hm_auto_dock")
-    #                         else:
-    #                             self.get_logger().warn("Invalid command code or series number | send_hm_auto_dock")
-    #                     else:
-    #                         self.get_logger().warn("Incomplete data frame | send_hm_auto_dock")
+                    #回充启停控制
+                    elif frame_length == b'\x00\x04':
+                        data = self.ser_android.read(3)
+                        if len(data) == 3:
+                            command_code, sequence_number, command = struct.unpack('BBB', data)
+                            if command_code == 0x27 and sequence_number == 0x00 :
+                                # 读取帧尾
+                                footer = self.ser_android.read(1)
+                                if footer == b'\x88':
+                                    # 发布动作值到 /android_voice_action
+                                    msg = UInt8()
+                                    msg.data = command
+                                    self.android_voice_action_publisher.publish(msg)
+                                    # 写入android语音识别的数据到写入下位机串口
+                                    # 重复写防止下位机没有反应
+                                    for i in range(1,3):
+                                        self.send_hm_auto_dock(command)
+                                        time.sleep(0.02)
+                                    self.get_logger().info(f"Received android voice action | send_hm_auto_dock: {command}")
+                                else:
+                                    self.get_logger().warn("Invalid frame footer | send_hm_auto_dock")
+                            else:
+                                self.get_logger().warn("Invalid command code or series number | send_hm_auto_dock")
+                        else:
+                            self.get_logger().warn("Incomplete data frame | send_hm_auto_dock")
 
-    #                 else:
-    #                     self.get_logger().warn("Read Android Invalid frame length")
-    #             else:
-    #                 self.get_logger().warn("Read Android Invalid frame header")
+                    else:
+                        self.get_logger().warn("Read Android Invalid frame length")
+                else:
+                    self.get_logger().warn("Read Android Invalid frame header")
 
     def __del__(self):
         """析构时关闭串口"""
@@ -500,10 +500,10 @@ def main(args=None):
         serial_thread.daemon = True
         serial_thread.start()
 
-        # # Start reading android serial data in a separate thread
-        # android_serial_thread = threading.Thread(target=node.read_android_serial_data)
-        # android_serial_thread.daemon = True
-        # android_serial_thread.start()
+        # Start reading android serial data in a separate thread
+        android_serial_thread = threading.Thread(target=node.read_android_serial_data)
+        android_serial_thread.daemon = True
+        android_serial_thread.start()
 
         rclpy.spin(node)
     except KeyboardInterrupt:
