@@ -97,10 +97,10 @@ class HmBaseNode(Node):
             angular_velocity = msg.angular.z
             action_code = 0x00
             if linear_velocity > 0.025 and abs(angular_velocity) < 0.05: #前进
-                action_code = 4
+                action_code = 3
                 self.send_speed_approximately(action_code)
             elif linear_velocity < -0.025 and abs(angular_velocity) < 0.05: #后退
-                action_code = 3
+                action_code = 4
                 self.send_speed_approximately(action_code)
             elif abs(linear_velocity) < 0.025 and angular_velocity > 0.05: #逆时针
                 action_code = 2
