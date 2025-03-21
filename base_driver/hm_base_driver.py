@@ -12,7 +12,12 @@ from robot_interfaces.msg import HMAutoDockTrigger
 import time
 import traceback
 from tf_transformations import quaternion_from_euler
-import covariances
+import math
+# import sys
+# import os
+# sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# from covariances import ODOM_POSE_COVARIANCE
 
 class BaseSerialError(Exception):
     def __init__(self, message=""):
@@ -30,7 +35,7 @@ class HmBaseNode(Node):
 
         # 初始化下位机串口连接
         self.ser_base = serial.Serial(
-            port='/dev/ttyUSB0',
+            port='/dev/ttyUSB1',
             baudrate=115200,
             bytesize=serial.EIGHTBITS,
             parity=serial.PARITY_NONE,
@@ -417,11 +422,22 @@ class HmBaseNode(Node):
 
 
     def cast_odom(self, data):
-        x = data.get('x')
-        y = data.get('y')
-        yaw = data.get('yaw')
-        v = data.get('v')
-        w = data.get('w')
+        x_ori = data.get('x')
+        y_ori = data.get('y')
+        yaw_ori = data.get('yaw')
+        v_ori = data.get('v')
+        w_ori = data.get('w')
+
+        # 参考坐标系绕 z 轴旋转 180 度
+        x = -x_ori
+        y = -y_ori
+        yaw = yaw_ori + math.pi
+        # 角度归一化到 [-π, π]
+        yaw = (yaw + math.pi) % (2 * math.pi) - math.pi
+        # 速度变换
+        v = -v_ori
+        w = w_ori
+
         msg = Odometry()
         msg.header.frame_id = 'odom'
         msg.child_frame_id = 'base_footprint'
@@ -436,12 +452,12 @@ class HmBaseNode(Node):
         msg.pose.pose.orientation.w = quaternion[3]
         msg.twist.twist.linear.x = v
         msg.twist.twist.angular.z = w
-        if msg.twist.twist.linear.x == 0 and msg.twist.twist.angular.z == 0:
-            msg.twist.covariance = covariances.ODOM_TWIST_COVARIANCE2
-            msg.pose.covariance = covariances.ODOM_POSE_COVARIANCE2
-        else:
-            msg.twist.covariance = covariances.ODOM_TWIST_COVARIANCE
-            msg.pose.covariance = covariances.ODOM_POSE_COVARIANCE
+        # if msg.twist.twist.linear.x == 0 and msg.twist.twist.angular.z == 0:
+        #     msg.twist.covariance = covariances.ODOM_TWIST_COVARIANCE2
+        #     msg.pose.covariance = covariances.ODOM_POSE_COVARIANCE2
+        # else:
+        #     msg.twist.covariance = covariances.ODOM_TWIST_COVARIANCE
+        #     msg.pose.covariance = covariances.ODOM_POSE_COVARIANCE
 
         self.odom_publisher.publish(msg)
     
