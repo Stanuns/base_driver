@@ -27,7 +27,7 @@ class HmBaseNode(Node):
 
         # 初始化下位机串口连接
         self.ser_base = serial.Serial(
-            port='/dev/hm_base',
+            port='/dev/ttyUSB1',
             baudrate=115200,
             bytesize=serial.EIGHTBITS,
             parity=serial.PARITY_NONE,
@@ -40,7 +40,7 @@ class HmBaseNode(Node):
 
         # 初始化Android串口连接
         self.ser_android = serial.Serial(
-            port='/dev/hm_android',
+            port='/dev/ttyUSB2',
             baudrate=115200,
             bytesize=serial.EIGHTBITS,
             parity=serial.PARITY_NONE,
@@ -163,6 +163,31 @@ class HmBaseNode(Node):
 
         except Exception as e:
             self.get_logger().error(f"Speed_approximately Frame sending to base failed: {str(e.message)}")
+    
+    def send_speed_voice_control(self, action_value):
+        """构建并发送数据帧"""
+        try:
+            # 校验动作值范围
+            if not (0 <= action_value <= 255):
+                raise ValueError("Action value out of range (0-255)")
+
+            # 构建数据帧
+            frame = bytes()
+            # 帧长（固定值）
+            frame += struct.pack('BB', 0x00, 0x07)
+            # 命令码 + 流水号
+            frame += struct.pack('BB', 0x22, 0x00)
+            # 系列编号 + 动作值
+            frame += struct.pack('BB', 0x01, action_value)
+            # 运动时间（小端模式 0x0320 = 800ms）
+            frame += struct.pack('<H', 800)  # 小端模式打包
+
+            # 发送数据
+            self._send_data_frame(frame)
+            self.get_logger().info(f"Sent send_speed_voice_control frame to base : 0x{action_value:02X}")
+
+        except Exception as e:
+            self.get_logger().error(f"send_speed_voice_control Frame sending to base failed: {str(e.message)}")
     
     def send_hm_auto_dock(self, action_value):
         """构建并发送数据帧"""
@@ -442,15 +467,15 @@ class HmBaseNode(Node):
                                     # 写入android语音识别的数据到写入下位机串口
                                     # 重复写防止下位机没有反应
                                     for i in range(1,3):
-                                        self.send_speed_approximately(action_value)
+                                        self.send_speed_voice_control(action_value)
                                         time.sleep(0.02)
-                                    self.get_logger().info(f"Received android voice action | send_speed_approximately: {action_value}")
+                                    self.get_logger().info(f"Received android voice action | send_speed_voice_control: {action_value}")
                                 else:
-                                    self.get_logger().warn("Invalid frame footer | send_speed_approximately")
+                                    self.get_logger().warn("Invalid frame footer | send_speed_voice_control")
                             else:
-                                self.get_logger().warn("Invalid command code or series number | send_speed_approximately")
+                                self.get_logger().warn("Invalid command code or series number | send_speed_voice_control")
                         else:
-                            self.get_logger().warn("Incomplete data frame | send_speed_approximately")
+                            self.get_logger().warn("Incomplete data frame | send_speed_voice_control")
 
                     #回充启停控制
                     elif frame_length == b'\x00\x04':
