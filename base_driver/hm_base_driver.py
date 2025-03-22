@@ -16,6 +16,8 @@ import math
 # import sys
 # import os
 # sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from tf2_ros import TransformBroadcaster
+from geometry_msgs.msg import TransformStamped
 
 # from covariances import ODOM_POSE_COVARIANCE
 
@@ -31,6 +33,7 @@ class HmBaseNode(Node):
         self.cmd_vel_exec_tag = True
 
         super().__init__('hm_serial_node')
+        self.tf_broadcaster = TransformBroadcaster(self)
         
         self.control_data_head = b'\xAA\x55'
         self.control_data_foot = b'\x88'
@@ -470,8 +473,22 @@ class HmBaseNode(Node):
         # else:
         #     msg.twist.covariance = covariances.ODOM_TWIST_COVARIANCE
         #     msg.pose.covariance = covariances.ODOM_POSE_COVARIANCE
-
         self.odom_publisher.publish(msg)
+
+        # Publish the transform
+        transform = TransformStamped()
+        transform.header.stamp = self.get_clock().now().to_msg()
+        transform.header.frame_id = 'odom'
+        transform.child_frame_id = 'base_footprint'
+        transform.transform.translation.x = x
+        transform.transform.translation.y = y
+        transform.transform.translation.z = 0.0
+        transform.transform.rotation.x = quaternion[0]
+        transform.transform.rotation.y = quaternion[1]
+        transform.transform.rotation.z = quaternion[2]
+        transform.transform.rotation.w = quaternion[3]
+
+        self.tf_broadcaster.sendTransform(transform)
     
     def cast_dock_state(self, data):
         msg = HMAutoDockState()
