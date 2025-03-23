@@ -28,6 +28,36 @@ class BaseSerialError(Exception):
 
 class HmBaseNode(Node):
     def __init__(self):
+        self.x = 0.0
+        self.y = 0.0
+        self.yaw = 0.0
+
+        self.ODOM_POSE_COVARIANCE = [float(x) for x in [0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 
+                        0.0, 0.001, 0.0, 0.0, 0.0, 0.0,
+                        0.0, 0.0, 0.001, 0.0, 0.0, 0.0,
+                        0.0, 0.0, 0.0, 0.001, 0.0, 0.0,
+                        0.0, 0.0, 0.0, 0.0, 0.001, 0.0,
+                        0.0, 0.0, 0.0, 0.0, 0.0, 0.03]]
+        self.ODOM_POSE_COVARIANCE2 = [float(x) for x in [0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 
+                        0.0, 0.001, 0.0, 0.0, 0.0, 0.0,
+                        0.0, 0.0, 0.001, 0.0, 0.0, 0.0,
+                        0.0, 0.0, 0.0, 0.001, 0.0, 0.0,
+                        0.0, 0.0, 0.0, 0.0, 0.001, 0.0,
+                        0.0, 0.0, 0.0, 0.0, 0.0, 0.03]]
+
+        self.ODOM_TWIST_COVARIANCE = [float(x) for x in [0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 
+                        0.0, 0.001, 0.0, 0.0, 0.0, 0.0,
+                        0.0, 0.0, 0.001, 0.0, 0.0, 0.0,
+                        0.0, 0.0, 0.0, 0.001, 0.0, 0.0,
+                        0.0, 0.0, 0.0, 0.0, 0.001, 0.0,
+                        0.0, 0.0, 0.0, 0.0, 0.0, 0.03]]
+        self.ODOM_TWIST_COVARIANCE2 = [float(x) for x in [0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 
+                        0.0, 0.001, 0.0, 0.0, 0.0, 0.0,
+                        0.0, 0.0, 0.001, 0.0, 0.0, 0.0,
+                        0.0, 0.0, 0.0, 0.001, 0.0, 0.0,
+                        0.0, 0.0, 0.0, 0.0, 0.001, 0.0,
+                        0.0, 0.0, 0.0, 0.0, 0.0, 0.03]]
+
         self.cmd_vel_code = 0x00
 
         self.cmd_vel_exec_tag = True
@@ -51,18 +81,18 @@ class HmBaseNode(Node):
             self.get_logger().error("Failed to open serial port!")
             raise Exception("Serial port open failed")
 
-        # 初始化Android串口连接
-        self.ser_android = serial.Serial(
-            port='/dev/ttyUSB2',
-            baudrate=115200,
-            bytesize=serial.EIGHTBITS,
-            parity=serial.PARITY_NONE,
-            stopbits=serial.STOPBITS_ONE,
-            timeout=1
-        )
-        if not self.ser_android.is_open:
-            self.get_logger().error("Failed to open android serial port!")
-            raise Exception("Android serial port open failed")
+        # # 初始化Android串口连接
+        # self.ser_android = serial.Serial(
+        #     port='/dev/ttyUSB2',
+        #     baudrate=115200,
+        #     bytesize=serial.EIGHTBITS,
+        #     parity=serial.PARITY_NONE,
+        #     stopbits=serial.STOPBITS_ONE,
+        #     timeout=1
+        # )
+        # if not self.ser_android.is_open:
+        #     self.get_logger().error("Failed to open android serial port!")
+        #     raise Exception("Android serial port open failed")
 
         self.subscription = self.create_subscription(
             Twist,
@@ -145,7 +175,7 @@ class HmBaseNode(Node):
         while rclpy.ok():
             if self.cmd_vel_exec_tag:
                 self.send_speed_approximately(self.cmd_vel_code)
-                time.sleep(0.05)
+                time.sleep(0.029)
 
     # def query_auto_dock_state(self):
     #     while rclpy.ok():
@@ -183,7 +213,7 @@ class HmBaseNode(Node):
             # 系列编号 + 动作值
             frame += struct.pack('BB', 0x01, action_value)
             # 运动时间（小端模式 0x0320 = 800ms）
-            frame += struct.pack('<H', 100)  # 小端模式打包
+            frame += struct.pack('<H', 25)  # 小端模式打包
 
             # 发送数据
             self._send_data_frame(frame)
@@ -437,56 +467,95 @@ class HmBaseNode(Node):
 
 
     def cast_odom(self, data):
-        x_ori = data.get('x')
-        y_ori = data.get('y')
-        yaw_ori = data.get('yaw')
+        #### 由于里程计上传的速度方向相反，需根据接收到的v,w重新计算odom的(x,y,yaw)
+        # x_ori = data.get('x')
+        # y_ori = data.get('y')
+        # yaw_ori = data.get('yaw')
+        # v_ori = data.get('v')
+        # w_ori = data.get('w')
+        
+        # # x = x_ori
+        # # y = y_ori
+        # # yaw = yaw_ori
+        # # # 角度归一化到 [-π, π]
+        # # yaw = yaw 
+        # # # 速度变换
+        # # v = v_ori
+        # # w = w_ori
+
+        # # 参考坐标系绕 z 轴旋转 180 度
+        # x = -x_ori
+        # y = -y_ori
+        # # yaw = yaw_ori + math.pi
+        # yaw = yaw_ori
+        # # 角度归一化到 [-π, π]
+        # yaw = (yaw + math.pi) % (2 * math.pi) - math.pi
+        # # 速度变换
+        # v = -v_ori
+        # w = w_ori
+
+        # 重新计算里程计
+        delta_t = 0.1
         v_ori = data.get('v')
         w_ori = data.get('w')
-
-        # 参考坐标系绕 z 轴旋转 180 度
-        x = -x_ori
-        y = -y_ori
-        yaw = yaw_ori + math.pi
-        # 角度归一化到 [-π, π]
-        yaw = (yaw + math.pi) % (2 * math.pi) - math.pi
-        # 速度变换
-        v = -v_ori
-        w = w_ori
-
+        v = -v_ori #下位机上传v取反
+        w = -w_ori #下位机上传w错误，需取反
+        # 计算 yaw 的变化量
+        delta_yaw = w * delta_t
+        # 更新 yaw
+        self.yaw += delta_yaw
+        self.yaw = (self.yaw + math.pi) % (2 * math.pi) - math.pi
+        # 计算 x 和 y 的变化量
+        if w != 0:
+            # 如果角速度不为零，使用圆弧运动模型
+            radius = v / w
+            delta_x = radius * (math.sin(self.yaw + delta_yaw) - math.sin(self.yaw))
+            delta_y = radius * (math.cos(self.yaw) - math.cos(self.yaw + delta_yaw))
+        else:
+            # 如果角速度为零，使用直线运动模型
+            delta_x = v * delta_t * math.cos(self.yaw)
+            delta_y = v * delta_t * math.sin(self.yaw)
+        # 更新 x 和 y
+        self.x += delta_x
+        self.y += delta_y
+        
         msg = Odometry()
         msg.header.frame_id = 'odom'
         msg.child_frame_id = 'base_footprint'
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.pose.pose.position.x = x
-        msg.pose.pose.position.y = y
+        msg.pose.pose.position.x = self.x
+        msg.pose.pose.position.y = self.y
         msg.pose.pose.position.z = 0.0
-        quaternion = quaternion_from_euler(0.0, 0.0, yaw)
+        quaternion = quaternion_from_euler(0.0, 0.0, self.yaw)
         msg.pose.pose.orientation.x = quaternion[0]
         msg.pose.pose.orientation.y = quaternion[1]
         msg.pose.pose.orientation.z = quaternion[2]
         msg.pose.pose.orientation.w = quaternion[3]
         msg.twist.twist.linear.x = v
         msg.twist.twist.angular.z = w
-        # if msg.twist.twist.linear.x == 0 and msg.twist.twist.angular.z == 0:
-        #     msg.twist.covariance = covariances.ODOM_TWIST_COVARIANCE2
-        #     msg.pose.covariance = covariances.ODOM_POSE_COVARIANCE2
-        # else:
-        #     msg.twist.covariance = covariances.ODOM_TWIST_COVARIANCE
-        #     msg.pose.covariance = covariances.ODOM_POSE_COVARIANCE
+        if abs(msg.twist.twist.linear.x) <= 0.001 and abs(msg.twist.twist.angular.z) <= 0.001:
+            msg.twist.covariance = self.ODOM_TWIST_COVARIANCE2
+            msg.pose.covariance = self.ODOM_POSE_COVARIANCE2
+        else:
+            msg.twist.covariance = self.ODOM_TWIST_COVARIANCE
+            msg.pose.covariance = self.ODOM_POSE_COVARIANCE
         self.odom_publisher.publish(msg)
 
         # Publish the transform
+        # yaw2 = -yaw
+        # yaw2 = (yaw2 + math.pi) % (2 * math.pi) - math.pi
+        quaternion2 = quaternion_from_euler(0.0, 0.0, self.yaw)
         transform = TransformStamped()
         transform.header.stamp = self.get_clock().now().to_msg()
         transform.header.frame_id = 'odom'
         transform.child_frame_id = 'base_footprint'
-        transform.transform.translation.x = x
-        transform.transform.translation.y = y
+        transform.transform.translation.x = self.x
+        transform.transform.translation.y = self.y
         transform.transform.translation.z = 0.0
-        transform.transform.rotation.x = quaternion[0]
-        transform.transform.rotation.y = quaternion[1]
-        transform.transform.rotation.z = quaternion[2]
-        transform.transform.rotation.w = quaternion[3]
+        transform.transform.rotation.x = quaternion2[0]
+        transform.transform.rotation.y = quaternion2[1]
+        transform.transform.rotation.z = quaternion2[2]
+        transform.transform.rotation.w = quaternion2[3]
 
         self.tf_broadcaster.sendTransform(transform)
     
@@ -499,77 +568,77 @@ class HmBaseNode(Node):
         self.dock_state_publisher.publish(msg)
         
 
-    ### 读取Android pad返回信息
-    def read_android_serial_data(self):
-        """读取android串口数据并处理"""
-        while rclpy.ok():
-            if self.ser_android.in_waiting > 0:
-                # 读取帧头
-                header = self.ser_android.read(2)
-                if header == b'\xAA\x55':
-                    self.get_logger().info(f"--------------read_android_serial_data--Have read header----------------")
-                    # 读取帧长
-                    frame_length = self.ser_android.read(2)
+    # ### 读取Android pad返回信息
+    # def read_android_serial_data(self):
+    #     """读取android串口数据并处理"""
+    #     while rclpy.ok():
+    #         if self.ser_android.in_waiting > 0:
+    #             # 读取帧头
+    #             header = self.ser_android.read(2)
+    #             if header == b'\xAA\x55':
+    #                 self.get_logger().info(f"--------------read_android_serial_data--Have read header----------------")
+    #                 # 读取帧长
+    #                 frame_length = self.ser_android.read(2)
 
-                    # 模糊运动控制
-                    if frame_length == b'\x00\x07':
-                        # 读取命令码、流水号、系列编号、动作值、运动时间
-                        data = self.ser_android.read(6)
-                        if len(data) == 6:
-                            command_code, sequence_number, series_number, action_value, motion_time = struct.unpack('BBBBH', data)
-                            if command_code == 0x22 and sequence_number == 0x00 and series_number == 0x01:
-                                # 读取帧尾
-                                footer = self.ser_android.read(1)
-                                if footer == b'\x88':
-                                    # 发布动作值到 /android_voice_action
-                                    msg = UInt8()
-                                    msg.data = action_value
-                                    self.android_voice_action_publisher.publish(msg)
-                                    self.cmd_vel_exec_tag = False
-                                    # 写入android语音识别的数据到写入下位机串口
-                                    # 重复写防止下位机没有反应
-                                    for i in range(1,3):
-                                        self.send_speed_voice_control(action_value)
-                                        time.sleep(0.02)
-                                    self.get_logger().info(f"Received android voice action | send_speed_voice_control: {action_value}")
-                                else:
-                                    self.get_logger().warn("Invalid frame footer | send_speed_voice_control")
-                            else:
-                                self.get_logger().warn("Invalid command code or series number | send_speed_voice_control")
-                        else:
-                            self.get_logger().warn("Incomplete data frame | send_speed_voice_control")
+    #                 # 模糊运动控制
+    #                 if frame_length == b'\x00\x07':
+    #                     # 读取命令码、流水号、系列编号、动作值、运动时间
+    #                     data = self.ser_android.read(6)
+    #                     if len(data) == 6:
+    #                         command_code, sequence_number, series_number, action_value, motion_time = struct.unpack('BBBBH', data)
+    #                         if command_code == 0x22 and sequence_number == 0x00 and series_number == 0x01:
+    #                             # 读取帧尾
+    #                             footer = self.ser_android.read(1)
+    #                             if footer == b'\x88':
+    #                                 # 发布动作值到 /android_voice_action
+    #                                 msg = UInt8()
+    #                                 msg.data = action_value
+    #                                 self.android_voice_action_publisher.publish(msg)
+    #                                 self.cmd_vel_exec_tag = False
+    #                                 # 写入android语音识别的数据到写入下位机串口
+    #                                 # 重复写防止下位机没有反应
+    #                                 for i in range(1,3):
+    #                                     self.send_speed_voice_control(action_value)
+    #                                     time.sleep(0.02)
+    #                                 self.get_logger().info(f"Received android voice action | send_speed_voice_control: {action_value}")
+    #                             else:
+    #                                 self.get_logger().warn("Invalid frame footer | send_speed_voice_control")
+    #                         else:
+    #                             self.get_logger().warn("Invalid command code or series number | send_speed_voice_control")
+    #                     else:
+    #                         self.get_logger().warn("Incomplete data frame | send_speed_voice_control")
 
-                    #回充启停控制
-                    elif frame_length == b'\x00\x04':
-                        data = self.ser_android.read(3)
-                        if len(data) == 3:
-                            command_code, sequence_number, command = struct.unpack('BBB', data)
-                            if command_code == 0x27 and sequence_number == 0x00 :
-                                # 读取帧尾
-                                footer = self.ser_android.read(1)
-                                if footer == b'\x88':
-                                    # 发布动作值到 /android_voice_action
-                                    msg = UInt8()
-                                    msg.data = command
-                                    self.android_voice_action_publisher.publish(msg)
-                                    self.cmd_vel_exec_tag = False
-                                    # 写入android语音识别的数据到写入下位机串口
-                                    # 重复写防止下位机没有反应
-                                    for i in range(1,3):
-                                        self.send_hm_auto_dock(command)
-                                        time.sleep(0.02)
-                                    self.get_logger().info(f"Received android voice action | send_hm_auto_dock: {command}")
-                                else:
-                                    self.get_logger().warn("Invalid frame footer | send_hm_auto_dock")
-                            else:
-                                self.get_logger().warn("Invalid command code or series number | send_hm_auto_dock")
-                        else:
-                            self.get_logger().warn("Incomplete data frame | send_hm_auto_dock")
+    #                 #回充启停控制
+    #                 elif frame_length == b'\x00\x04':
+    #                     data = self.ser_android.read(3)
+    #                     if len(data) == 3:
+    #                         command_code, sequence_number, command = struct.unpack('BBB', data)
+    #                         if command_code == 0x27 and sequence_number == 0x00 :
+    #                             # 读取帧尾
+    #                             footer = self.ser_android.read(1)
+    #                             if footer == b'\x88':
+    #                                 # 发布动作值到 /android_voice_action
+    #                                 msg = UInt8()
+    #                                 msg.data = command
+    #                                 self.android_voice_action_publisher.publish(msg)
+    #                                 self.cmd_vel_exec_tag = False
+    #                                 # 写入android语音识别的数据到写入下位机串口
+    #                                 # 重复写防止下位机没有反应
+    #                                 for i in range(1,3):
+    #                                     self.send_hm_auto_dock(command)
+    #                                     time.sleep(0.02)
+    #                                 self.get_logger().info(f"Received android voice action | send_hm_auto_dock: {command}")
+    #                             else:
+    #                                 self.get_logger().warn("Invalid frame footer | send_hm_auto_dock")
+    #                         else:
+    #                             self.get_logger().warn("Invalid command code or series number | send_hm_auto_dock")
+    #                     else:
+    #                         self.get_logger().warn("Incomplete data frame | send_hm_auto_dock")
 
-                    else:
-                        self.get_logger().warn("Read Android Invalid frame length")
-                else:
-                    self.get_logger().warn("Read Android Invalid frame header")
+    #                 else:
+    #                     self.get_logger().warn("Read Android Invalid frame length")
+    #             else:
+    #                 self.get_logger().warn("Read Android Invalid frame header")
 
     def __del__(self):
         """析构时关闭串口"""
@@ -588,10 +657,10 @@ def main(args=None):
         serial_thread.daemon = True
         serial_thread.start()
 
-        # Start reading android serial data in a separate thread
-        android_serial_thread = threading.Thread(target=node.read_android_serial_data)
-        android_serial_thread.daemon = True
-        android_serial_thread.start()
+        # # Start reading android serial data in a separate thread
+        # android_serial_thread = threading.Thread(target=node.read_android_serial_data)
+        # android_serial_thread.daemon = True
+        # android_serial_thread.start()
 
         # # query auto dock state
         # query_auto_dock_state_thread = threading.Thread(target=node.query_auto_dock_state)
