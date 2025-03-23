@@ -59,6 +59,7 @@ class HmBaseNode(Node):
                         0.0, 0.0, 0.0, 0.0, 0.0, 0.03]]
 
         self.cmd_vel_code = 0x00
+        self.run_time = 0
 
         self.cmd_vel_exec_tag = True
 
@@ -81,18 +82,18 @@ class HmBaseNode(Node):
             self.get_logger().error("Failed to open serial port!")
             raise Exception("Serial port open failed")
 
-        # # 初始化Android串口连接
-        # self.ser_android = serial.Serial(
-        #     port='/dev/ttyUSB2',
-        #     baudrate=115200,
-        #     bytesize=serial.EIGHTBITS,
-        #     parity=serial.PARITY_NONE,
-        #     stopbits=serial.STOPBITS_ONE,
-        #     timeout=1
-        # )
-        # if not self.ser_android.is_open:
-        #     self.get_logger().error("Failed to open android serial port!")
-        #     raise Exception("Android serial port open failed")
+        # 初始化Android串口连接
+        self.ser_android = serial.Serial(
+            port='/dev/ttyUSB2',
+            baudrate=115200,
+            bytesize=serial.EIGHTBITS,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            timeout=1
+        )
+        if not self.ser_android.is_open:
+            self.get_logger().error("Failed to open android serial port!")
+            raise Exception("Android serial port open failed")
 
         self.subscription = self.create_subscription(
             Twist,
@@ -100,6 +101,12 @@ class HmBaseNode(Node):
             self.handle_hm_cmd_vel,
             10
         )
+        # self.subscription = self.create_subscription(
+        #     Twist,
+        #     '/cmd_vel_nav',
+        #     self.handle_hm_cmd_vel_nav,
+        #     10
+        # )
         self.subscription2 = self.create_subscription(
             HMAutoDockTrigger,
             '/hm_auto_dock_trigger',
@@ -129,6 +136,68 @@ class HmBaseNode(Node):
         )
 
         self.get_logger().info("Node initialized")
+    
+    # # 处理cmd_vel_nav
+    # def handle_hm_cmd_vel_nav(self, msg):
+    #     try:
+    #         self.cmd_vel_exec_tag = False
+    #         # 消息提取
+    #         self.get_logger().info("---handle_hm_cmd_vel_nav---")
+    #         linear_velocity = msg.linear.x
+    #         angular_velocity = msg.angular.z
+    #         cmd_vel_nav_code = 0x00
+    #         # run_time = 200
+    #         if linear_velocity > 0.025*2 and abs(angular_velocity) < 0.05*2: #前进
+    #             cmd_vel_nav_code = 3
+    #             self.send_speed_approximately(cmd_vel_nav_code, 80)
+    #             time.sleep(0.08)
+    #         elif linear_velocity < -0.025*2 and abs(angular_velocity) < 0.05*2: #后退
+    #             cmd_vel_nav_code = 4
+    #             self.send_speed_approximately(cmd_vel_nav_code, 80)
+    #             time.sleep(0.08)
+    #         elif abs(linear_velocity) < 0.025*2 and angular_velocity > 0.05*2: #逆时针
+    #             cmd_vel_nav_code = 2
+    #             self.send_speed_approximately(cmd_vel_nav_code, 20)
+    #             time.sleep(0.02)
+    #         elif abs(linear_velocity) < 0.025*2 and angular_velocity < -0.05*2: #顺时针
+    #             cmd_vel_nav_code = 1
+    #             self.send_speed_approximately(cmd_vel_nav_code, 20)
+    #             time.sleep(0.02)
+    #         elif linear_velocity > 0.025*2 and angular_velocity > 0.05*2: #前进 逆时针
+    #             # cmd_vel_nav_code = 3
+    #             # self.send_speed_approximately(cmd_vel_nav_code, 40)
+    #             # time.sleep(0.04)
+    #             cmd_vel_nav_code = 2
+    #             self.send_speed_approximately(cmd_vel_nav_code, 10)
+    #             time.sleep(0.01)
+    #         elif linear_velocity > 0.025*2 and angular_velocity < -0.05*2: #前进 顺时针
+    #             # cmd_vel_nav_code = 3
+    #             # self.send_speed_approximately(cmd_vel_nav_code, 40)
+    #             # time.sleep(0.04)
+    #             cmd_vel_nav_code = 1
+    #             self.send_speed_approximately(cmd_vel_nav_code, 10)
+    #             time.sleep(0.01)
+    #         elif linear_velocity < -0.025*2 and angular_velocity > 0.05*2: #后退 逆时针
+    #             # cmd_vel_nav_code = 4
+    #             # self.send_speed_approximately(cmd_vel_nav_code, 40)
+    #             # time.sleep(0.04)
+    #             cmd_vel_nav_code = 2
+    #             self.send_speed_approximately(cmd_vel_nav_code, 10)
+    #             time.sleep(0.01)
+    #         elif linear_velocity < -0.025*2 and angular_velocity < -0.05*3.4: #后退 顺时针
+    #             # cmd_vel_nav_code = 4
+    #             # self.send_speed_approximately(cmd_vel_nav_code, 40)
+    #             # time.sleep(0.04)
+    #             cmd_vel_nav_code = 1
+    #             self.send_speed_approximately(cmd_vel_nav_code, 10)
+    #             time.sleep(0.01)
+    #         elif abs(linear_velocity) <= 0.025*2 and abs(angular_velocity) <= 0.05*3.4:
+    #             cmd_vel_nav_code = 0
+    #             self.send_speed_approximately(cmd_vel_nav_code, 80)
+    #             time.sleep(0.08)
+            
+    #     except ValueError as e:
+    #         self.get_logger().warn(f"Invalid value: {e}")
 
     # 处理hm_cmd_vel
     def handle_hm_cmd_vel(self, msg):
@@ -136,36 +205,46 @@ class HmBaseNode(Node):
         try:
             # 消息提取
             self.cmd_vel_exec_tag = True
-            self.get_logger().info("---handle_hm_cmd_vel---")
+            # self.get_logger().info("---handle_hm_cmd_vel---")
             linear_velocity = msg.linear.x
             angular_velocity = msg.angular.z
             self.cmd_vel_code = 0x00
-            if linear_velocity > 0.025 and abs(angular_velocity) < 0.05: #前进
+            self.run_time = 20
+            if linear_velocity > 0.025 and abs(angular_velocity) < 0.05*2: #前进
                 self.cmd_vel_code = 3
+                self.run_time = 80
                 # self.send_speed_approximately(self.cmd_vel_code)
-            elif linear_velocity < -0.025 and abs(angular_velocity) < 0.05: #后退
+            elif linear_velocity < -0.025 and abs(angular_velocity) < 0.05*2: #后退
                 self.cmd_vel_code = 4
+                self.run_time = 80
                 # self.send_speed_approximately(self.cmd_vel_code)
-            elif abs(linear_velocity) < 0.025 and angular_velocity > 0.05: #逆时针
+            elif abs(linear_velocity) < 0.025 and angular_velocity > 0.05*2: #逆时针
                 self.cmd_vel_code = 2
+                self.run_time = 80
                 # self.send_speed_approximately(self.cmd_vel_code)
-            elif abs(linear_velocity) < 0.025 and angular_velocity < -0.05: #顺时针
+            elif abs(linear_velocity) < 0.025 and angular_velocity < -0.05*2: #顺时针
                 self.cmd_vel_code = 1
+                self.run_time = 80
                 # self.send_speed_approximately(self.cmd_vel_code)
-            elif linear_velocity > 0.025 and angular_velocity > 0.05: #前进 逆时针
+            elif linear_velocity > 0.025 and angular_velocity > 0.05*2: #前进 逆时针
                 self.cmd_vel_code = 2
+                self.run_time = 80
                 # self.send_speed_approximately(self.cmd_vel_code)
-            elif linear_velocity > 0.025 and angular_velocity < -0.05: #前进 顺时针
+            elif linear_velocity > 0.025 and angular_velocity < -0.05*2: #前进 顺时针
                 self.cmd_vel_code = 1
+                self.run_time = 80
                 # self.send_speed_approximately(self.cmd_vel_code)
-            elif linear_velocity < -0.025 and angular_velocity > 0.05: #后退 逆时针
+            elif linear_velocity < -0.025 and angular_velocity > 0.05*2: #后退 逆时针
                 self.cmd_vel_code = 2
+                self.run_time = 80
                 # self.send_speed_approximately(self.cmd_vel_code)
-            elif linear_velocity < -0.025 and angular_velocity < -0.05: #后退 顺时针
+            elif linear_velocity < -0.025 and angular_velocity < -0.05*2: #后退 顺时针
                 self.cmd_vel_code = 1
+                self.run_time = 80
                 # self.send_speed_approximately(self.cmd_vel_code)
-            elif abs(linear_velocity) <= 0.025 and abs(angular_velocity) <= 0.05:
+            elif abs(linear_velocity) <= 0.025 and abs(angular_velocity) <= 0.05*2:
                 self.cmd_vel_code = 0
+                self.run_time = 80
                 # self.send_speed_approximately(self.cmd_vel_code)
             
         except ValueError as e:
@@ -174,8 +253,9 @@ class HmBaseNode(Node):
     def cmd_vel_continue(self):
         while rclpy.ok():
             if self.cmd_vel_exec_tag:
-                self.send_speed_approximately(self.cmd_vel_code)
-                time.sleep(0.029)
+                self.send_speed_approximately(self.cmd_vel_code, self.run_time)
+            time.sleep(self.run_time/1000)
+        # pass
 
     # def query_auto_dock_state(self):
     #     while rclpy.ok():
@@ -197,7 +277,7 @@ class HmBaseNode(Node):
             self.get_logger().warn(f"Invalid value: {e}")
 
     ### 控制信息发送至底盘下位机
-    def send_speed_approximately(self, action_value):
+    def send_speed_approximately(self, action_value, run_time):
         """构建并发送数据帧"""
         try:
             # 校验动作值范围
@@ -213,7 +293,7 @@ class HmBaseNode(Node):
             # 系列编号 + 动作值
             frame += struct.pack('BB', 0x01, action_value)
             # 运动时间（小端模式 0x0320 = 800ms）
-            frame += struct.pack('<H', 25)  # 小端模式打包
+            frame += struct.pack('<H', run_time)  # 小端模式打包
 
             # 发送数据
             self._send_data_frame(frame)
@@ -568,77 +648,77 @@ class HmBaseNode(Node):
         self.dock_state_publisher.publish(msg)
         
 
-    # ### 读取Android pad返回信息
-    # def read_android_serial_data(self):
-    #     """读取android串口数据并处理"""
-    #     while rclpy.ok():
-    #         if self.ser_android.in_waiting > 0:
-    #             # 读取帧头
-    #             header = self.ser_android.read(2)
-    #             if header == b'\xAA\x55':
-    #                 self.get_logger().info(f"--------------read_android_serial_data--Have read header----------------")
-    #                 # 读取帧长
-    #                 frame_length = self.ser_android.read(2)
+    ### 读取Android pad返回信息
+    def read_android_serial_data(self):
+        """读取android串口数据并处理"""
+        while rclpy.ok():
+            if self.ser_android.in_waiting > 0:
+                # 读取帧头
+                header = self.ser_android.read(2)
+                if header == b'\xAA\x55':
+                    self.get_logger().info(f"--------------read_android_serial_data--Have read header----------------")
+                    # 读取帧长
+                    frame_length = self.ser_android.read(2)
 
-    #                 # 模糊运动控制
-    #                 if frame_length == b'\x00\x07':
-    #                     # 读取命令码、流水号、系列编号、动作值、运动时间
-    #                     data = self.ser_android.read(6)
-    #                     if len(data) == 6:
-    #                         command_code, sequence_number, series_number, action_value, motion_time = struct.unpack('BBBBH', data)
-    #                         if command_code == 0x22 and sequence_number == 0x00 and series_number == 0x01:
-    #                             # 读取帧尾
-    #                             footer = self.ser_android.read(1)
-    #                             if footer == b'\x88':
-    #                                 # 发布动作值到 /android_voice_action
-    #                                 msg = UInt8()
-    #                                 msg.data = action_value
-    #                                 self.android_voice_action_publisher.publish(msg)
-    #                                 self.cmd_vel_exec_tag = False
-    #                                 # 写入android语音识别的数据到写入下位机串口
-    #                                 # 重复写防止下位机没有反应
-    #                                 for i in range(1,3):
-    #                                     self.send_speed_voice_control(action_value)
-    #                                     time.sleep(0.02)
-    #                                 self.get_logger().info(f"Received android voice action | send_speed_voice_control: {action_value}")
-    #                             else:
-    #                                 self.get_logger().warn("Invalid frame footer | send_speed_voice_control")
-    #                         else:
-    #                             self.get_logger().warn("Invalid command code or series number | send_speed_voice_control")
-    #                     else:
-    #                         self.get_logger().warn("Incomplete data frame | send_speed_voice_control")
+                    # 模糊运动控制
+                    if frame_length == b'\x00\x07':
+                        # 读取命令码、流水号、系列编号、动作值、运动时间
+                        data = self.ser_android.read(6)
+                        if len(data) == 6:
+                            command_code, sequence_number, series_number, action_value, motion_time = struct.unpack('BBBBH', data)
+                            if command_code == 0x22 and sequence_number == 0x00 and series_number == 0x01:
+                                # 读取帧尾
+                                footer = self.ser_android.read(1)
+                                if footer == b'\x88':
+                                    # 发布动作值到 /android_voice_action
+                                    msg = UInt8()
+                                    msg.data = action_value
+                                    self.android_voice_action_publisher.publish(msg)
+                                    self.cmd_vel_exec_tag = False
+                                    # 写入android语音识别的数据到写入下位机串口
+                                    # 重复写防止下位机没有反应
+                                    for i in range(1,3):
+                                        self.send_speed_voice_control(action_value)
+                                        time.sleep(0.02)
+                                    self.get_logger().info(f"Received android voice action | send_speed_voice_control: {action_value}")
+                                else:
+                                    self.get_logger().warn("Invalid frame footer | send_speed_voice_control")
+                            else:
+                                self.get_logger().warn("Invalid command code or series number | send_speed_voice_control")
+                        else:
+                            self.get_logger().warn("Incomplete data frame | send_speed_voice_control")
 
-    #                 #回充启停控制
-    #                 elif frame_length == b'\x00\x04':
-    #                     data = self.ser_android.read(3)
-    #                     if len(data) == 3:
-    #                         command_code, sequence_number, command = struct.unpack('BBB', data)
-    #                         if command_code == 0x27 and sequence_number == 0x00 :
-    #                             # 读取帧尾
-    #                             footer = self.ser_android.read(1)
-    #                             if footer == b'\x88':
-    #                                 # 发布动作值到 /android_voice_action
-    #                                 msg = UInt8()
-    #                                 msg.data = command
-    #                                 self.android_voice_action_publisher.publish(msg)
-    #                                 self.cmd_vel_exec_tag = False
-    #                                 # 写入android语音识别的数据到写入下位机串口
-    #                                 # 重复写防止下位机没有反应
-    #                                 for i in range(1,3):
-    #                                     self.send_hm_auto_dock(command)
-    #                                     time.sleep(0.02)
-    #                                 self.get_logger().info(f"Received android voice action | send_hm_auto_dock: {command}")
-    #                             else:
-    #                                 self.get_logger().warn("Invalid frame footer | send_hm_auto_dock")
-    #                         else:
-    #                             self.get_logger().warn("Invalid command code or series number | send_hm_auto_dock")
-    #                     else:
-    #                         self.get_logger().warn("Incomplete data frame | send_hm_auto_dock")
+                    #回充启停控制
+                    elif frame_length == b'\x00\x04':
+                        data = self.ser_android.read(3)
+                        if len(data) == 3:
+                            command_code, sequence_number, command = struct.unpack('BBB', data)
+                            if command_code == 0x27 and sequence_number == 0x00 :
+                                # 读取帧尾
+                                footer = self.ser_android.read(1)
+                                if footer == b'\x88':
+                                    # 发布动作值到 /android_voice_action
+                                    msg = UInt8()
+                                    msg.data = command
+                                    self.android_voice_action_publisher.publish(msg)
+                                    self.cmd_vel_exec_tag = False
+                                    # 写入android语音识别的数据到写入下位机串口
+                                    # 重复写防止下位机没有反应
+                                    for i in range(1,3):
+                                        self.send_hm_auto_dock(command)
+                                        time.sleep(0.02)
+                                    self.get_logger().info(f"Received android voice action | send_hm_auto_dock: {command}")
+                                else:
+                                    self.get_logger().warn("Invalid frame footer | send_hm_auto_dock")
+                            else:
+                                self.get_logger().warn("Invalid command code or series number | send_hm_auto_dock")
+                        else:
+                            self.get_logger().warn("Incomplete data frame | send_hm_auto_dock")
 
-    #                 else:
-    #                     self.get_logger().warn("Read Android Invalid frame length")
-    #             else:
-    #                 self.get_logger().warn("Read Android Invalid frame header")
+                    else:
+                        self.get_logger().warn("Read Android Invalid frame length")
+                else:
+                    self.get_logger().warn("Read Android Invalid frame header")
 
     def __del__(self):
         """析构时关闭串口"""
@@ -657,10 +737,10 @@ def main(args=None):
         serial_thread.daemon = True
         serial_thread.start()
 
-        # # Start reading android serial data in a separate thread
-        # android_serial_thread = threading.Thread(target=node.read_android_serial_data)
-        # android_serial_thread.daemon = True
-        # android_serial_thread.start()
+        # Start reading android serial data in a separate thread
+        android_serial_thread = threading.Thread(target=node.read_android_serial_data)
+        android_serial_thread.daemon = True
+        android_serial_thread.start()
 
         # # query auto dock state
         # query_auto_dock_state_thread = threading.Thread(target=node.query_auto_dock_state)
