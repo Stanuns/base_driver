@@ -62,6 +62,7 @@ class HmBaseNode(Node):
         self.run_time = 0
 
         self.cmd_vel_exec_tag = True
+        self.count_0x00 = 0
 
         super().__init__('hm_serial_node')
         self.tf_broadcaster = TransformBroadcaster(self)
@@ -213,47 +214,56 @@ class HmBaseNode(Node):
             if linear_velocity > 0.025 and abs(angular_velocity) < 0.05*2: #前进
                 self.cmd_vel_code = 3
                 self.run_time = 80
-                # self.send_speed_approximately(self.cmd_vel_code)
+                # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
             elif linear_velocity < -0.025 and abs(angular_velocity) < 0.05*2: #后退
                 self.cmd_vel_code = 4
                 self.run_time = 80
-                # self.send_speed_approximately(self.cmd_vel_code)
+                # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
             elif abs(linear_velocity) < 0.025 and angular_velocity > 0.05*2: #逆时针
                 self.cmd_vel_code = 2
                 self.run_time = 80
-                # self.send_speed_approximately(self.cmd_vel_code)
+                # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
             elif abs(linear_velocity) < 0.025 and angular_velocity < -0.05*2: #顺时针
                 self.cmd_vel_code = 1
                 self.run_time = 80
-                # self.send_speed_approximately(self.cmd_vel_code)
+                # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
             elif linear_velocity > 0.025 and angular_velocity > 0.05*2: #前进 逆时针
                 self.cmd_vel_code = 2
                 self.run_time = 80
-                # self.send_speed_approximately(self.cmd_vel_code)
+                # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
             elif linear_velocity > 0.025 and angular_velocity < -0.05*2: #前进 顺时针
                 self.cmd_vel_code = 1
                 self.run_time = 80
-                # self.send_speed_approximately(self.cmd_vel_code)
+                # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
             elif linear_velocity < -0.025 and angular_velocity > 0.05*2: #后退 逆时针
                 self.cmd_vel_code = 2
                 self.run_time = 80
-                # self.send_speed_approximately(self.cmd_vel_code)
+                # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
             elif linear_velocity < -0.025 and angular_velocity < -0.05*2: #后退 顺时针
                 self.cmd_vel_code = 1
                 self.run_time = 80
-                # self.send_speed_approximately(self.cmd_vel_code)
+                # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
             elif abs(linear_velocity) <= 0.025 and abs(angular_velocity) <= 0.05*2:
                 self.cmd_vel_code = 0
                 self.run_time = 80
-                # self.send_speed_approximately(self.cmd_vel_code)
+                # for i in range(1,3):
+                #     self.send_speed_approximately(self.cmd_vel_code, self.run_time)
+                #     time.sleep(self.run_time/1000)
+
             
         except ValueError as e:
             self.get_logger().warn(f"Invalid value: {e}")
 
     def cmd_vel_continue(self):
         while rclpy.ok():
+            # self.get_logger().info(f"self.cmd_vel_code : 0x{self.cmd_vel_code:02X}, {self.cmd_vel_code != 0x00}")
             if self.cmd_vel_exec_tag:
-                self.send_speed_approximately(self.cmd_vel_code, self.run_time)
+                if self.cmd_vel_code != 0x00:
+                    self.count_0x00 = 0
+                    self.send_speed_approximately(self.cmd_vel_code, self.run_time)
+                elif self.cmd_vel_code == 0x00 and self.count_0x00 < 3:
+                    self.send_speed_approximately(self.cmd_vel_code, self.run_time)
+                    self.count_0x00 += 1
             time.sleep(self.run_time/1000)
         # pass
 
@@ -707,7 +717,7 @@ class HmBaseNode(Node):
                                     for i in range(1,3):
                                         self.send_hm_auto_dock(command)
                                         time.sleep(0.02)
-                                    self.get_logger().info(f"Received android voice action | send_hm_auto_dock: {command}")
+                                    self.get_logger().info(f"Received android voice action | send_hm_auto_dock: {command}, self.cmd_vel_exec_tag:{self.cmd_vel_exec_tag}")
                                 else:
                                     self.get_logger().warn("Invalid frame footer | send_hm_auto_dock")
                             else:
