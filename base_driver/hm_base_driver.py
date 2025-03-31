@@ -75,7 +75,7 @@ class HmBaseNode(Node):
 
         # 初始化下位机串口连接
         self.ser_base = serial.Serial(
-            port='/dev/ttyUSB1',
+            port='/dev/ttyUSB2',
             baudrate=115200,
             bytesize=serial.EIGHTBITS,
             parity=serial.PARITY_NONE,
@@ -400,13 +400,13 @@ class HmBaseNode(Node):
         frame += struct.pack('BB', 0x00, 0x09)
         # 命令码 + 流水号
         frame += struct.pack('BB', 0x77, 0x00)
-        # 线速度角速度左右轮速度及方向
+        # 左右轮速度及方向
         frame += struct.pack('<H', int(sleft*1000))
         frame += struct.pack('<H', int(sright*1000))
         frame += (left_dir + right_dir)
 
         self._send_data_frame(frame)
-        self.get_logger().info(f"Sent wheel speed frame to base")
+        self.get_logger().info(f"Sent wheel speed frame to base: {int(sleft*1000), {left_dir}, int(sright*1000), {right_dir}}")
 
     def _send_data_frame(self, data_tob_send): 
         control_data = self.control_data_head + data_tob_send + self.control_data_foot 
