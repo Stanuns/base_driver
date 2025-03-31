@@ -75,7 +75,7 @@ class HmBaseNode(Node):
 
         # 初始化下位机串口连接
         self.ser_base = serial.Serial(
-            port='/dev/ttyUSB2',
+            port='/dev/ttyUSB0',
             baudrate=115200,
             bytesize=serial.EIGHTBITS,
             parity=serial.PARITY_NONE,
@@ -278,6 +278,10 @@ class HmBaseNode(Node):
             linear_velocity = msg.linear.x
             angular_velocity = msg.angular.z
 
+            #由于华麦底盘与上层控制指令相反,需处理
+            linear_velocity = -linear_velocity
+            angular_velocity = angular_velocity
+
             #线速度角速度转换成左右轮线速度由华麦提供
             # self.wheelSeparate = 0.134
             # self.wheelRadius = 0.03
@@ -400,13 +404,20 @@ class HmBaseNode(Node):
         frame += struct.pack('BB', 0x00, 0x09)
         # 命令码 + 流水号
         frame += struct.pack('BB', 0x77, 0x00)
-        # 左右轮速度及方向
-        frame += struct.pack('<H', int(sleft*1000))
-        frame += struct.pack('<H', int(sright*1000))
+        # 左右轮线速度及方向
+        # frame += struct.pack('<H', int(sleft*1000))
+        # frame += struct.pack('<H', int(sright*1000))
+        left_speed_bytes = struct.pack('<H', int(sleft*1000))
+        right_speed_bytes = struct.pack('<H', int(sright*1000))
+        # left_speed_bytes = b'\x43\x00'
+        # right_speed_bytes = b'\x43\x00'
+        frame += left_speed_bytes
+        frame += right_speed_bytes
         frame += (left_dir + right_dir)
 
         self._send_data_frame(frame)
-        self.get_logger().info(f"Sent wheel speed frame to base: {int(sleft*1000), {left_dir}, int(sright*1000), {right_dir}}")
+        # self.get_logger().info(f"Sent wheel speed frame to base: {left_speed_bytes.hex()}, {right_speed_bytes.hex()}, {left_dir.hex()}, {right_dir.hex()}")
+        self.get_logger().info(f"Sent wheel speed frame to base, frame: {frame.hex()}")
 
     def _send_data_frame(self, data_tob_send): 
         control_data = self.control_data_head + data_tob_send + self.control_data_foot 
@@ -495,6 +506,8 @@ class HmBaseNode(Node):
                 return self._case_odom(data_in_frame)
             elif code == 39: #回充反馈
                 return self._case_auto_dock(data_in_frame)
+            if code == 121: #imu
+                return self._case_imu(data_in_frame)
             else:
                 self.get_logger().warn(f"Unknown code_raw received: {code}")
                 return None
@@ -575,6 +588,21 @@ class HmBaseNode(Node):
         series_number, state = struct.unpack('BB', data_raw)
         data['series_number'] = series_number
         data['state'] = state
+        return data
+    @staticmethod
+    def _case_imu(data_raw): 
+        if len(data_raw) != 24:  # refer to the data sheet provided by jinfei
+            e = BaseSerialError()
+            e.message = "imu data corrupted"
+            raise e
+        data = {'type': 'odom'}
+        acc_x_raw, acc_y_raw, acc_z_raw,roll_raw, pitch_raw, yaw_raw = struct.unpack('<6f', data_raw)
+        data['acc_x_raw'] = acc_x_raw
+        data['acc_y_raw'] = acc_y_raw
+        data['acc_z_raw'] = acc_z_raw
+        data['roll_raw'] = roll_raw
+        data['pitch_raw'] = pitch_raw
+        data['yaw_raw'] = yaw_raw
         return data
 
 
