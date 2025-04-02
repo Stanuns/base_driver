@@ -102,7 +102,7 @@ class HmBaseNode(Node):
         self.subscription = self.create_subscription(
             Twist,
             '/cmd_vel',
-            self.handle_hm_cmd_vel, #self.handle_hm_cmd_vel handle_cmd_vel
+            self.handle_cmd_vel, #self.handle_hm_cmd_vel handle_cmd_vel
             10
         )
         # self.subscription = self.create_subscription(
@@ -625,8 +625,8 @@ class HmBaseNode(Node):
         yaw = yaw_ori
         # 角度归一化到 [-π, π]
         yaw = (yaw + math.pi) % (2 * math.pi) - math.pi
-        v = v_ori #下位机上传v取反
-        w = w_ori #角速度不变， (之前下位机上传w错误，需取反) *1.8
+        v = -v_ori #下位机上传v取反
+        w = w_ori #角速度不变
 
         #### 由于里程计上传的速度方向相反，需根据接收到的v,w重新计算odom的(x,y,yaw)
         delta_t = 0.1
@@ -654,10 +654,10 @@ class HmBaseNode(Node):
         msg.header.frame_id = 'odom'
         msg.child_frame_id = 'base_footprint'
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.pose.pose.position.x = x
-        msg.pose.pose.position.y = y
+        msg.pose.pose.position.x = self.x
+        msg.pose.pose.position.y = self.y
         msg.pose.pose.position.z = 0.0
-        quaternion = quaternion_from_euler(0.0, 0.0, yaw)
+        quaternion = quaternion_from_euler(0.0, 0.0, self.yaw)
         msg.pose.pose.orientation.x = quaternion[0]
         msg.pose.pose.orientation.y = quaternion[1]
         msg.pose.pose.orientation.z = quaternion[2]
@@ -675,13 +675,13 @@ class HmBaseNode(Node):
         # Publish the transform
         # yaw2 = -yaw
         # yaw2 = (yaw2 + math.pi) % (2 * math.pi) - math.pi
-        quaternion2 = quaternion_from_euler(0.0, 0.0, yaw)
+        quaternion2 = quaternion_from_euler(0.0, 0.0, self.yaw)
         transform = TransformStamped()
         transform.header.stamp = self.get_clock().now().to_msg()
         transform.header.frame_id = 'odom'
         transform.child_frame_id = 'base_footprint'
-        transform.transform.translation.x = x
-        transform.transform.translation.y = y
+        transform.transform.translation.x = self.x
+        transform.transform.translation.y = self.y
         transform.transform.translation.z = 0.0
         transform.transform.rotation.x = quaternion2[0]
         transform.transform.rotation.y = quaternion2[1]
