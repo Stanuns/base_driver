@@ -75,7 +75,7 @@ class HmBaseNode(Node):
 
         # 初始化下位机串口连接
         self.ser_base = serial.Serial(
-            port='/dev/ttyUSB0',
+            port='/dev/ttyUSB1',
             baudrate=115200,
             bytesize=serial.EIGHTBITS,
             parity=serial.PARITY_NONE,
@@ -102,7 +102,7 @@ class HmBaseNode(Node):
         self.subscription = self.create_subscription(
             Twist,
             '/cmd_vel',
-            self.handle_cmd_vel, #self.handle_hm_cmd_vel
+            self.handle_hm_cmd_vel, #self.handle_hm_cmd_vel handle_cmd_vel
             10
         )
         # self.subscription = self.create_subscription(
@@ -203,59 +203,58 @@ class HmBaseNode(Node):
     #     except ValueError as e:
     #         self.get_logger().warn(f"Invalid value: {e}")
 
-    # # 处理hm_cmd_vel，只能给出基本前后左右及运动时间，无法指定速度
-    # def handle_hm_cmd_vel(self, msg):
-    #     """处理速度命令的回调函数"""
-    #     try:
-    #         # 消息提取
-    #         self.cmd_vel_exec_tag = True
-    #         # self.get_logger().info("---handle_hm_cmd_vel---")
-    #         linear_velocity = msg.linear.x
-    #         angular_velocity = msg.angular.z
-    #         self.cmd_vel_code = 0x00
-    #         self.run_time = 20
-    #         if linear_velocity > 0.025 and abs(angular_velocity) < 0.05*2: #前进
-    #             self.cmd_vel_code = 3
-    #             self.run_time = 80
-    #             # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
-    #         elif linear_velocity < -0.025 and abs(angular_velocity) < 0.05*2: #后退
-    #             self.cmd_vel_code = 4
-    #             self.run_time = 80
-    #             # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
-    #         elif abs(linear_velocity) < 0.025 and angular_velocity > 0.05*2: #逆时针
-    #             self.cmd_vel_code = 2
-    #             self.run_time = 80
-    #             # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
-    #         elif abs(linear_velocity) < 0.025 and angular_velocity < -0.05*2: #顺时针
-    #             self.cmd_vel_code = 1
-    #             self.run_time = 80
-    #             # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
-    #         elif linear_velocity > 0.025 and angular_velocity > 0.05*2: #前进 逆时针
-    #             self.cmd_vel_code = 2
-    #             self.run_time = 80
-    #             # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
-    #         elif linear_velocity > 0.025 and angular_velocity < -0.05*2: #前进 顺时针
-    #             self.cmd_vel_code = 1
-    #             self.run_time = 80
-    #             # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
-    #         elif linear_velocity < -0.025 and angular_velocity > 0.05*2: #后退 逆时针
-    #             self.cmd_vel_code = 2
-    #             self.run_time = 80
-    #             # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
-    #         elif linear_velocity < -0.025 and angular_velocity < -0.05*2: #后退 顺时针
-    #             self.cmd_vel_code = 1
-    #             self.run_time = 80
-    #             # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
-    #         elif abs(linear_velocity) <= 0.025 and abs(angular_velocity) <= 0.05*2:
-    #             self.cmd_vel_code = 0
-    #             self.run_time = 80
-    #             # for i in range(1,3):
-    #             #     self.send_speed_approximately(self.cmd_vel_code, self.run_time)
-    #             #     time.sleep(self.run_time/1000)
-
-            
-    #     except ValueError as e:
-    #         self.get_logger().warn(f"Invalid value: {e}")
+    # 处理hm_cmd_vel，只能给出基本前后左右及运动时间，无法指定速度
+    def handle_hm_cmd_vel(self, msg):
+        """处理速度命令的回调函数"""
+        try:
+            # 消息提取
+            self.cmd_vel_exec_tag = True
+            # self.get_logger().info("---handle_hm_cmd_vel---")
+            linear_velocity = msg.linear.x
+            angular_velocity = msg.angular.z
+            self.cmd_vel_code = 0x00
+            self.run_time = 20
+            if linear_velocity > 0.025 and abs(angular_velocity) < 0.05*2: #前进
+                self.cmd_vel_code = 3
+                self.run_time = 80
+                # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
+            elif linear_velocity < -0.025 and abs(angular_velocity) < 0.05*2: #后退
+                self.cmd_vel_code = 4
+                self.run_time = 80
+                # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
+            elif abs(linear_velocity) < 0.025 and angular_velocity > 0.05*2: #逆时针
+                self.cmd_vel_code = 2
+                self.run_time = 80
+                # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
+            elif abs(linear_velocity) < 0.025 and angular_velocity < -0.05*2: #顺时针
+                self.cmd_vel_code = 1
+                self.run_time = 80
+                # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
+            elif linear_velocity > 0.025 and angular_velocity > 0.05*2: #前进 逆时针
+                self.cmd_vel_code = 2
+                self.run_time = 80
+                # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
+            elif linear_velocity > 0.025 and angular_velocity < -0.05*2: #前进 顺时针
+                self.cmd_vel_code = 1
+                self.run_time = 80
+                # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
+            elif linear_velocity < -0.025 and angular_velocity > 0.05*2: #后退 逆时针
+                self.cmd_vel_code = 2
+                self.run_time = 80
+                # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
+            elif linear_velocity < -0.025 and angular_velocity < -0.05*2: #后退 顺时针
+                self.cmd_vel_code = 1
+                self.run_time = 80
+                # self.send_speed_approximately(self.cmd_vel_code, self.run_time)
+            elif abs(linear_velocity) <= 0.025 and abs(angular_velocity) <= 0.05*2:
+                self.cmd_vel_code = 0
+                self.run_time = 80
+                # for i in range(1,3):
+                #     self.send_speed_approximately(self.cmd_vel_code, self.run_time)
+                #     time.sleep(self.run_time/1000)
+            self.send_speed_approximately(self.cmd_vel_code, self.run_time)
+        except ValueError as e:
+            self.get_logger().warn(f"Invalid value: {e}")
 
     # def cmd_vel_continue(self):
     #     while rclpy.ok():
@@ -287,6 +286,15 @@ class HmBaseNode(Node):
             # self.wheelRadius = 0.03
             left_speed = linear_velocity - 0.5 * self.wheelSeparate * angular_velocity
             right_speed = linear_velocity + 0.5 * self.wheelSeparate * angular_velocity
+            #由于华麦底盘轮子的最大线速度只有0.23m/s,需做限制,等比例限制
+            MAX_SPEED = 0.23  # 最大线速度绝对值限制(m/s)
+            abs_left = abs(left_speed)
+            abs_right = abs(right_speed)
+            max_ratio = max(abs_left, abs_right) / MAX_SPEED
+            if max_ratio > 1.0:  # 需要限制
+                left_speed = left_speed / max_ratio
+                right_speed = right_speed / max_ratio
+       
 
             self.send_speed(left_speed, right_speed)
             
@@ -607,43 +615,26 @@ class HmBaseNode(Node):
 
 
     def cast_odom(self, data):
-        #### 由于里程计上传的速度方向相反，需根据接收到的v,w重新计算odom的(x,y,yaw)
-        # x_ori = data.get('x')
-        # y_ori = data.get('y')
-        # yaw_ori = data.get('yaw')
-        # v_ori = data.get('v')
-        # w_ori = data.get('w')
-        
-        # # x = x_ori
-        # # y = y_ori
-        # # yaw = yaw_ori
-        # # # 角度归一化到 [-π, π]
-        # # yaw = yaw 
-        # # # 速度变换
-        # # v = v_ori
-        # # w = w_ori
-
-        # # 参考坐标系绕 z 轴旋转 180 度
-        # x = -x_ori
-        # y = -y_ori
-        # # yaw = yaw_ori + math.pi
-        # yaw = yaw_ori
-        # # 角度归一化到 [-π, π]
-        # yaw = (yaw + math.pi) % (2 * math.pi) - math.pi
-        # # 速度变换
-        # v = -v_ori
-        # w = w_ori
-
-        # 重新计算里程计
-        delta_t = 0.1
+        x_ori = data.get('x')
+        y_ori = data.get('y')
+        yaw_ori = data.get('yaw')
         v_ori = data.get('v')
         w_ori = data.get('w')
-        v = -v_ori #下位机上传v取反
-        w = w_ori #角速度不变， (20250328之前 下位机上传w错误，需取反)
+        x = x_ori
+        y = y_ori
+        yaw = yaw_ori
+        # 角度归一化到 [-π, π]
+        yaw = (yaw + math.pi) % (2 * math.pi) - math.pi
+        v = v_ori #下位机上传v取反
+        w = w_ori #角速度不变， (之前下位机上传w错误，需取反) *1.8
+
+        #### 由于里程计上传的速度方向相反，需根据接收到的v,w重新计算odom的(x,y,yaw)
+        delta_t = 0.1
         # 计算 yaw 的变化量
         delta_yaw = w * delta_t
         # 更新 yaw
         self.yaw += delta_yaw
+        # 角度归一化到 [-π, π]
         self.yaw = (self.yaw + math.pi) % (2 * math.pi) - math.pi
         # 计算 x 和 y 的变化量
         if w != 0:
@@ -663,10 +654,10 @@ class HmBaseNode(Node):
         msg.header.frame_id = 'odom'
         msg.child_frame_id = 'base_footprint'
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.pose.pose.position.x = self.x
-        msg.pose.pose.position.y = self.y
+        msg.pose.pose.position.x = x
+        msg.pose.pose.position.y = y
         msg.pose.pose.position.z = 0.0
-        quaternion = quaternion_from_euler(0.0, 0.0, self.yaw)
+        quaternion = quaternion_from_euler(0.0, 0.0, yaw)
         msg.pose.pose.orientation.x = quaternion[0]
         msg.pose.pose.orientation.y = quaternion[1]
         msg.pose.pose.orientation.z = quaternion[2]
@@ -684,20 +675,20 @@ class HmBaseNode(Node):
         # Publish the transform
         # yaw2 = -yaw
         # yaw2 = (yaw2 + math.pi) % (2 * math.pi) - math.pi
-        quaternion2 = quaternion_from_euler(0.0, 0.0, self.yaw)
+        quaternion2 = quaternion_from_euler(0.0, 0.0, yaw)
         transform = TransformStamped()
         transform.header.stamp = self.get_clock().now().to_msg()
         transform.header.frame_id = 'odom'
         transform.child_frame_id = 'base_footprint'
-        transform.transform.translation.x = self.x
-        transform.transform.translation.y = self.y
+        transform.transform.translation.x = x
+        transform.transform.translation.y = y
         transform.transform.translation.z = 0.0
         transform.transform.rotation.x = quaternion2[0]
         transform.transform.rotation.y = quaternion2[1]
         transform.transform.rotation.z = quaternion2[2]
         transform.transform.rotation.w = quaternion2[3]
 
-        # self.tf_broadcaster.sendTransform(transform)
+        self.tf_broadcaster.sendTransform(transform)
     
     def cast_dock_state(self, data):
         msg = HMAutoDockState()
