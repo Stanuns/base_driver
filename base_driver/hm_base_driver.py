@@ -5,6 +5,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from std_msgs.msg import UInt8
 from nav_msgs.msg import Odometry
+from sensor_msgs.msg import Imu
 import serial
 import struct
 from robot_interfaces.msg import HMAutoDockState
@@ -122,6 +123,12 @@ class HmBaseNode(Node):
         self.odom_publisher = self.create_publisher(
             Odometry,
             '/odom',
+            10
+        )
+
+        self.imu_publisher = self.create_publisher(
+            Imu,
+            '/imu/data_raw',
             10
         )
 
@@ -501,6 +508,8 @@ class HmBaseNode(Node):
                     self.cast_odom(data)
                 elif income_data_type =='auto_dock':
                     self.cast_dock_state(data)
+                elif income_data_type =='imu':
+                    self.cast_imu(data)
                 else: 
                     pass
                     return
@@ -603,7 +612,7 @@ class HmBaseNode(Node):
             e = BaseSerialError()
             e.message = "imu data corrupted"
             raise e
-        data = {'type': 'odom'}
+        data = {'type': 'imu'}
         acc_x_raw, acc_y_raw, acc_z_raw,roll_raw, pitch_raw, yaw_raw = struct.unpack('<6f', data_raw)
         data['acc_x_raw'] = acc_x_raw
         data['acc_y_raw'] = acc_y_raw
@@ -697,7 +706,29 @@ class HmBaseNode(Node):
         state = data.get('state')
         msg.state = state
         self.dock_state_publisher.publish(msg)
-        
+    
+    def cast_imu(self, data):
+        msg = Imu()
+        msg.header.frame_id = 'imu_link'
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.linear_acceleration.x =  data.get('acc_x_raw')
+        msg.linear_acceleration.y =  data.get('acc_y_raw')
+        msg.linear_acceleration.z =  data.get('acc_z_raw')
+        msg.linear_acceleration_covariance = [0.000289,0,0,0,0.000289,0,0,0,0.000289]
+        msg.angular_velocity.x = 0.0
+        msg.angular_velocity.y = 0.0
+        msg.angular_velocity.z = 0.0
+        msg.angular_velocity_covariance = [4.0e-8, 0, 0, 0, 4.0e-8, 0, 0, 0, 4.0e-08]
+        roll_t = data.get('roll_raw')
+        pitch_t = data.get('pitch_raw')
+        yaw_t = data.get('yaw_raw')
+        quat = quaternion_from_euler(roll_t, pitch_t, yaw_t)
+        msg.orientation.x =  quat[0]
+        msg.orientation.y =  quat[1]
+        msg.orientation.z =  quat[2]
+        msg.orientation.w =  quat[3]
+        msg.orientation_covariance = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+        self.imu_publisher.publish(msg)
 
     # ### 读取Android pad返回信息
     # def read_android_serial_data(self):
