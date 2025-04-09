@@ -76,7 +76,7 @@ class HmBaseNode(Node):
 
         # 初始化下位机串口连接
         self.ser_base = serial.Serial(
-            port='/dev/ttyUSB1',
+            port='/dev/ttyUSB0',
             baudrate=115200,
             bytesize=serial.EIGHTBITS,
             parity=serial.PARITY_NONE,
@@ -714,11 +714,11 @@ class HmBaseNode(Node):
         msg.linear_acceleration.x =  data.get('acc_x_raw')
         msg.linear_acceleration.y =  data.get('acc_y_raw')
         msg.linear_acceleration.z =  data.get('acc_z_raw')
-        msg.linear_acceleration_covariance = [0.000289,0,0,0,0.000289,0,0,0,0.000289]
+        msg.linear_acceleration_covariance = [0.000289, 0.0, 0.0, 0.0, 0.000289, 0.0, 0.0, 0.0,0.000289]
         msg.angular_velocity.x = 0.0
         msg.angular_velocity.y = 0.0
         msg.angular_velocity.z = 0.0
-        msg.angular_velocity_covariance = [4.0e-8, 0, 0, 0, 4.0e-8, 0, 0, 0, 4.0e-08]
+        msg.angular_velocity_covariance = [4.0e-8, 0.0, 0.0, 0.0, 4.0e-8, 0.0, 0.0, 0.0, 4.0e-08]
         roll_t = data.get('roll_raw')
         pitch_t = data.get('pitch_raw')
         yaw_t = data.get('yaw_raw')
@@ -727,7 +727,7 @@ class HmBaseNode(Node):
         msg.orientation.y =  quat[1]
         msg.orientation.z =  quat[2]
         msg.orientation.w =  quat[3]
-        msg.orientation_covariance = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+        msg.orientation_covariance = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self.imu_publisher.publish(msg)
 
     # ### 读取Android pad返回信息
