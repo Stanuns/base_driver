@@ -76,7 +76,7 @@ class HmBaseNode(Node):
 
         # 初始化下位机串口连接
         self.ser_base = serial.Serial(
-            port='/dev/ttyUSB0',
+            port='/dev/ttyUSB1',
             baudrate=115200,
             bytesize=serial.EIGHTBITS,
             parity=serial.PARITY_NONE,
@@ -700,7 +700,7 @@ class HmBaseNode(Node):
         transform.transform.rotation.z = quaternion2[2]
         transform.transform.rotation.w = quaternion2[3]
 
-        self.tf_broadcaster.sendTransform(transform)
+        # self.tf_broadcaster.sendTransform(transform)
     
     def cast_dock_state(self, data):
         msg = HMAutoDockState()
@@ -722,10 +722,10 @@ class HmBaseNode(Node):
         msg.angular_velocity.y = data.get('gyro_y_raw')*math.pi/180
         msg.angular_velocity.z = data.get('gyro_z_raw')*math.pi/180
         msg.angular_velocity_covariance = [4.0e-8, 0.0, 0.0, 0.0, 4.0e-8, 0.0, 0.0, 0.0, 4.0e-08]
-        roll_t = data.get('roll_raw')
-        pitch_t = data.get('pitch_raw')
-        yaw_t = data.get('yaw_raw')
-        quat = quaternion_from_euler(roll_t, pitch_t, yaw_t*math.pi/180)
+        roll_t = data.get('roll_raw')*math.pi/180
+        pitch_t = data.get('pitch_raw')*math.pi/180
+        yaw_t = data.get('yaw_raw')*math.pi/180
+        quat = quaternion_from_euler(roll_t, pitch_t, yaw_t)
         msg.orientation.x =  quat[0]
         msg.orientation.y =  quat[1]
         msg.orientation.z =  quat[2]
