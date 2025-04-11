@@ -608,15 +608,18 @@ class HmBaseNode(Node):
         return data
     @staticmethod
     def _case_imu(data_raw): 
-        if len(data_raw) != 24:  # refer to the data sheet provided by jinfei
+        if len(data_raw) != 36:  # refer to the data sheet provided by jinfei
             e = BaseSerialError()
             e.message = "imu data corrupted"
             raise e
         data = {'type': 'imu'}
-        acc_x_raw, acc_y_raw, acc_z_raw,roll_raw, pitch_raw, yaw_raw = struct.unpack('<6f', data_raw)
+        acc_x_raw, acc_y_raw, acc_z_raw, gyro_x_raw, gyro_y_raw, gyro_z_raw, roll_raw, pitch_raw, yaw_raw = struct.unpack('<9f', data_raw)
         data['acc_x_raw'] = acc_x_raw
         data['acc_y_raw'] = acc_y_raw
         data['acc_z_raw'] = acc_z_raw
+        data['gyro_x_raw'] = gyro_x_raw
+        data['gyro_y_raw'] = gyro_y_raw
+        data['gyro_z_raw'] = gyro_z_raw
         data['roll_raw'] = roll_raw
         data['pitch_raw'] = pitch_raw
         data['yaw_raw'] = yaw_raw
@@ -715,14 +718,14 @@ class HmBaseNode(Node):
         msg.linear_acceleration.y =  data.get('acc_y_raw')
         msg.linear_acceleration.z =  data.get('acc_z_raw')
         msg.linear_acceleration_covariance = [0.000289, 0.0, 0.0, 0.0, 0.000289, 0.0, 0.0, 0.0,0.000289]
-        msg.angular_velocity.x = 0.0
-        msg.angular_velocity.y = 0.0
-        msg.angular_velocity.z = 0.0
+        msg.angular_velocity.x = data.get('gyro_x_raw')*math.pi/180
+        msg.angular_velocity.y = data.get('gyro_y_raw')*math.pi/180
+        msg.angular_velocity.z = data.get('gyro_z_raw')*math.pi/180
         msg.angular_velocity_covariance = [4.0e-8, 0.0, 0.0, 0.0, 4.0e-8, 0.0, 0.0, 0.0, 4.0e-08]
         roll_t = data.get('roll_raw')
         pitch_t = data.get('pitch_raw')
         yaw_t = data.get('yaw_raw')
-        quat = quaternion_from_euler(roll_t, pitch_t, yaw_t)
+        quat = quaternion_from_euler(roll_t, pitch_t, yaw_t*math.pi/180)
         msg.orientation.x =  quat[0]
         msg.orientation.y =  quat[1]
         msg.orientation.z =  quat[2]
