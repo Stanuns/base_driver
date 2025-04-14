@@ -65,7 +65,7 @@ class HmBaseNode(Node):
         self.cmd_vel_code = 0x00
         self.run_time = 0
 
-        self.cmd_vel_exec_tag = True
+        # self.cmd_vel_exec_tag = True
         self.count_0x00 = 0
 
         super().__init__('hm_serial_node')
@@ -73,6 +73,8 @@ class HmBaseNode(Node):
         
         self.control_data_head = b'\xAA\x55'
         self.control_data_foot = b'\x88'
+
+        self.is_near_dock = 0
 
         # 初始化下位机串口连接
         self.ser_base = serial.Serial(
@@ -119,6 +121,13 @@ class HmBaseNode(Node):
             10
         )
 
+        self.subscription3 = self.create_subscription(
+            UInt8,
+            '/is_near_dock',
+            self.handle_is_near_dock,
+            10
+        )
+
         # publisher for /odom
         self.odom_publisher = self.create_publisher(
             Odometry,
@@ -140,9 +149,14 @@ class HmBaseNode(Node):
         )
 
         # New publisher for /android_voice_action
-        self.android_voice_action_publisher = self.create_publisher(
+        self.android_voice_motion_publisher = self.create_publisher(
             UInt8,
-            '/android_voice_action',
+            '/android_voice_motion',
+            10
+        )
+        self.android_voice_dock_publisher = self.create_publisher(
+            UInt8,
+            '/android_voice_dock',
             10
         )
 
@@ -215,7 +229,7 @@ class HmBaseNode(Node):
         """处理速度命令的回调函数"""
         try:
             # 消息提取
-            self.cmd_vel_exec_tag = True
+            # self.cmd_vel_exec_tag = True
             # self.get_logger().info("---handle_hm_cmd_vel---")
             linear_velocity = msg.linear.x
             angular_velocity = msg.angular.z
@@ -317,7 +331,7 @@ class HmBaseNode(Node):
 
     # 处理hm_auto_dock
     def handle_hm_auto_dock(self, msg):
-        self.cmd_vel_exec_tag = False
+        # self.cmd_vel_exec_tag = False
         """处理"""
         try:
             # 消息提取
@@ -326,6 +340,16 @@ class HmBaseNode(Node):
             self.send_hm_auto_dock(action_code)
         except ValueError as e:
             self.get_logger().warn(f"Invalid value: {e}")
+
+    def handle_is_near_dock(self, msg):
+        """处理"""
+        try:
+            # 消息提取
+            self.get_logger().info("---handle_is_near_dock---")
+            self.is_near_dock = msg.data
+        except ValueError as e:
+            self.get_logger().warn(f"Invalid value: {e}")
+
 
     ### 控制信息发送至底盘下位机
     def send_speed_approximately(self, action_value, run_time):
@@ -758,8 +782,8 @@ class HmBaseNode(Node):
                                     # 发布动作值到 /android_voice_action
                                     msg = UInt8()
                                     msg.data = action_value
-                                    self.android_voice_action_publisher.publish(msg)
-                                    self.cmd_vel_exec_tag = False
+                                    self.android_voice_motion_publisher.publish(msg)
+                                    # self.cmd_vel_exec_tag = False
                                     # 写入android语音识别的数据到写入下位机串口
                                     # 重复写防止下位机没有反应
                                     for i in range(1,3):
@@ -785,14 +809,21 @@ class HmBaseNode(Node):
                                     # 发布动作值到 /android_voice_action
                                     msg = UInt8()
                                     msg.data = command
-                                    self.android_voice_action_publisher.publish(msg)
-                                    self.cmd_vel_exec_tag = False
+                                    self.android_voice_dock_publisher.publish(msg) # 调用action导航到充电桩附近的点
+                                    # self.cmd_vel_exec_tag = False
+
+                                    while self.is_near_dock != 1 and command == 0x02:
+                                        self.get_logger().info(f"nav2 to near dock: {self.is_near_dock}")
+                                        time.sleep(0.02)
                                     # 写入android语音识别的数据到写入下位机串口
                                     # 重复写防止下位机没有反应
                                     for i in range(1,3):
                                         self.send_hm_auto_dock(command)
                                         time.sleep(0.02)
-                                    self.get_logger().info(f"Received android voice action | send_hm_auto_dock: {command}, self.cmd_vel_exec_tag:{self.cmd_vel_exec_tag}")
+
+                                    self.is_near_dock = 0
+
+                                    self.get_logger().info(f"Received android voice action | send_hm_auto_dock: {command}")
                                 else:
                                     self.get_logger().warn("Invalid frame footer | send_hm_auto_dock")
                             else:
