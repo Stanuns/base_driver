@@ -632,11 +632,11 @@ class HmBaseNode(Node):
         yaw_ori = data.get('yaw')
         v_ori = data.get('v')
         w_ori = data.get('w')
-        x = x_ori
-        y = y_ori
-        yaw = yaw_ori
+        x_ = x_ori
+        y_ = y_ori
+        yaw_ = yaw_ori
         # 角度归一化到 [-π, π]
-        yaw = (yaw + math.pi) % (2 * math.pi) - math.pi
+        yaw_ = (yaw_ + math.pi) % (2 * math.pi) - math.pi
         v = -v_ori #下位机上传v取反
         w = w_ori #角速度不变
 
@@ -718,13 +718,13 @@ class HmBaseNode(Node):
         msg.linear_acceleration.y =  data.get('acc_y_raw')
         msg.linear_acceleration.z =  data.get('acc_z_raw')
         msg.linear_acceleration_covariance = [0.000289, 0.0, 0.0, 0.0, 0.000289, 0.0, 0.0, 0.0,0.000289]
-        msg.angular_velocity.x = data.get('gyro_x_raw')*math.pi/180
-        msg.angular_velocity.y = data.get('gyro_y_raw')*math.pi/180
-        msg.angular_velocity.z = data.get('gyro_z_raw')*math.pi/180
+        msg.angular_velocity.x = data.get('gyro_x_raw')#*math.pi/180
+        msg.angular_velocity.y = data.get('gyro_y_raw')#*math.pi/180
+        msg.angular_velocity.z = data.get('gyro_z_raw')#*math.pi/180
         msg.angular_velocity_covariance = [4.0e-8, 0.0, 0.0, 0.0, 4.0e-8, 0.0, 0.0, 0.0, 4.0e-08]
-        roll_t = data.get('roll_raw')*math.pi/180
-        pitch_t = data.get('pitch_raw')*math.pi/180
-        yaw_t = data.get('yaw_raw')*math.pi/180
+        roll_t = data.get('roll_raw')#*math.pi/180
+        pitch_t = data.get('pitch_raw')#*math.pi/180
+        yaw_t = data.get('yaw_raw')#*math.pi/180
         quat = quaternion_from_euler(roll_t, pitch_t, yaw_t)
         msg.orientation.x =  quat[0]
         msg.orientation.y =  quat[1]
