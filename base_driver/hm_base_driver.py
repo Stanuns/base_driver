@@ -318,10 +318,10 @@ class HmBaseNode(Node):
        
 
             # self.send_speed(left_speed, right_speed)
-            if abs(left_speed) <= 0.001 and abs(right_speed) <= 0.001 and self.count_0x00 <= 4:
+            if abs(left_speed) <= 0.0034 and abs(right_speed) <= 0.0034 and self.count_0x00 <= 4:
                 self.send_speed(left_speed, right_speed)
                 self.count_0x00 += 1
-            elif abs(left_speed) <= 0.001 and abs(right_speed) <= 0.001 and self.count_0x00 > 4:
+            elif abs(left_speed) <= 0.0034 and abs(right_speed) <= 0.0034 and self.count_0x00 > 4:
                 pass
             else:
                 self.send_speed(left_speed, right_speed)
@@ -798,6 +798,7 @@ class HmBaseNode(Node):
                                         self.send_speed_voice_control(action_value)
                                         time.sleep(0.02)
                                     self.get_logger().info(f"Received android voice action | send_speed_voice_control: {action_value}")
+                                    self.is_near_dock = 0
                                 else:
                                     self.get_logger().warn("Invalid frame footer | send_speed_voice_control")
                             else:
@@ -821,15 +822,13 @@ class HmBaseNode(Node):
                                     # self.cmd_vel_exec_tag = False
 
                                     while self.is_near_dock != 1 and command == 0x02:
-                                        self.get_logger().info(f"nav2 to near dock: {self.is_near_dock}")
-                                        time.sleep(0.02)
+                                        self.get_logger().info(f"nav2 to near dock: {self.is_near_dock}, {command}")
+                                        time.sleep(0.2)
                                     # 写入android语音识别的数据到写入下位机串口
                                     # 重复写防止下位机没有反应
                                     for i in range(1,3):
                                         self.send_hm_auto_dock(command)
-                                        time.sleep(0.02)
-
-                                    self.is_near_dock = 0
+                                        time.sleep(0.2)
 
                                     self.get_logger().info(f"Received android voice action | send_hm_auto_dock: {command}")
                                 else:
