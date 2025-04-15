@@ -317,7 +317,15 @@ class HmBaseNode(Node):
                 right_speed = right_speed / max_ratio
        
 
-            self.send_speed(left_speed, right_speed)
+            # self.send_speed(left_speed, right_speed)
+            if abs(left_speed) <= 0.001 and abs(right_speed) <= 0.001 and self.count_0x00 <= 4:
+                self.send_speed(left_speed, right_speed)
+                self.count_0x00 += 1
+            elif abs(left_speed) <= 0.001 and abs(right_speed) <= 0.001 and self.count_0x00 > 4:
+                pass
+            else:
+                self.send_speed(left_speed, right_speed)
+                self.count_0x00 = 0
             
         except ValueError as e:
             self.get_logger().warn(f"Invalid value: {e}")
