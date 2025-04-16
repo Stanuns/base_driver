@@ -820,6 +820,7 @@ class HmBaseNode(Node):
                                     msg.data = command
                                     self.android_voice_dock_publisher.publish(msg) # 调用action导航到充电桩附近的点
                                     # self.cmd_vel_exec_tag = False
+                                    time.sleep(1)
 
                                     while self.is_near_dock != 1 and command == 0x02:
                                         self.get_logger().info(f"nav2 to near dock: {self.is_near_dock}, {command}")
