@@ -795,11 +795,15 @@ class HmBaseNode(Node):
                                     # 发布动作值到 /android_voice_action
                                     msg0 = UInt8()
                                     msg0.data = 0
-                                    self.nav_to_goal_recycle_publisher.publish(msg0)#暂停巡航点
+                                    for i in range(1,4):
+                                        self.nav_to_goal_recycle_publisher.publish(msg0)#暂停巡航点
+                                        time.sleep(0.05)
                                     time.sleep(1)
                                     msg = UInt8()
                                     msg.data = action_value
-                                    self.android_voice_motion_publisher.publish(msg)
+                                    for i in range(1,4):
+                                        self.android_voice_motion_publisher.publish(msg)
+                                        time.sleep(0.05)
                                     # self.cmd_vel_exec_tag = False
                                     # 写入android语音识别的数据到写入下位机串口
                                     # 重复写防止下位机没有反应
@@ -827,11 +831,15 @@ class HmBaseNode(Node):
                                     # 发布动作值到 /android_voice_action
                                     msg0 = UInt8()
                                     msg0.data = 0
-                                    self.nav_to_goal_recycle_publisher.publish(msg0)#暂停巡航点
+                                    for i in range(1,4):
+                                        self.nav_to_goal_recycle_publisher.publish(msg0)#暂停巡航点
+                                        time.sleep(0.05)
                                     time.sleep(1)
                                     msg = UInt8()
                                     msg.data = command
-                                    self.android_voice_dock_publisher.publish(msg) # 调用action导航到充电桩附近的点
+                                    for i in range(1,4):
+                                        self.android_voice_dock_publisher.publish(msg) # 调用action导航到充电桩附近的点
+                                        time.sleep(0.05)
                                     # self.cmd_vel_exec_tag = False
                                     time.sleep(1)
 
