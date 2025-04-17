@@ -159,6 +159,11 @@ class HmBaseNode(Node):
             '/android_voice_dock',
             10
         )
+        self.nav_to_goal_recycle_publisher = self.create_publisher(
+            UInt8,
+            '/nav_to_goal_recycle_trigger',
+            10
+        )
 
         self.get_logger().info("Node initialized")
     
@@ -300,7 +305,7 @@ class HmBaseNode(Node):
 
             #由于华麦底盘与上层控制指令相反,需处理
             linear_velocity = -linear_velocity
-            angular_velocity = angular_velocity
+            angular_velocity = angular_velocity*1.5
 
             #线速度角速度转换成左右轮线速度由华麦提供
             # self.wheelSeparate = 0.134
@@ -318,10 +323,10 @@ class HmBaseNode(Node):
        
 
             # self.send_speed(left_speed, right_speed)
-            if abs(left_speed) <= 0.0034 and abs(right_speed) <= 0.0034 and self.count_0x00 <= 4:
+            if abs(linear_velocity)<0.0001 and abs(left_speed) <= 0.0085 and abs(right_speed) <= 0.0085 and self.count_0x00 <= 4:
                 self.send_speed(left_speed, right_speed)
                 self.count_0x00 += 1
-            elif abs(left_speed) <= 0.0034 and abs(right_speed) <= 0.0034 and self.count_0x00 > 4:
+            elif abs(linear_velocity)<0.0001 and abs(left_speed) <= 0.0085 and abs(right_speed) <= 0.0085 and self.count_0x00 > 4:
                 pass
             else:
                 self.send_speed(left_speed, right_speed)
@@ -353,7 +358,7 @@ class HmBaseNode(Node):
         """处理"""
         try:
             # 消息提取
-            self.get_logger().info("---handle_is_near_dock---")
+            # self.get_logger().info("---handle_is_near_dock---")
             self.is_near_dock = msg.data
         except ValueError as e:
             self.get_logger().warn(f"Invalid value: {e}")
@@ -788,6 +793,10 @@ class HmBaseNode(Node):
                                 footer = self.ser_android.read(1)
                                 if footer == b'\x88':
                                     # 发布动作值到 /android_voice_action
+                                    msg0 = UInt8()
+                                    msg0.data = 0
+                                    self.nav_to_goal_recycle_publisher.publish(msg0)#暂停巡航点
+                                    time.sleep(1)
                                     msg = UInt8()
                                     msg.data = action_value
                                     self.android_voice_motion_publisher.publish(msg)
@@ -816,6 +825,10 @@ class HmBaseNode(Node):
                                 footer = self.ser_android.read(1)
                                 if footer == b'\x88':
                                     # 发布动作值到 /android_voice_action
+                                    msg0 = UInt8()
+                                    msg0.data = 0
+                                    self.nav_to_goal_recycle_publisher.publish(msg0)#暂停巡航点
+                                    time.sleep(1)
                                     msg = UInt8()
                                     msg.data = command
                                     self.android_voice_dock_publisher.publish(msg) # 调用action导航到充电桩附近的点
@@ -823,7 +836,7 @@ class HmBaseNode(Node):
                                     time.sleep(1)
 
                                     while self.is_near_dock != 1 and command == 0x02:
-                                        self.get_logger().info(f"nav2 to near dock: {self.is_near_dock}, {command}")
+                                        self.get_logger().info(f"navigating to near dock: {self.is_near_dock}, {command}")
                                         time.sleep(0.2)
                                     # 写入android语音识别的数据到写入下位机串口
                                     # 重复写防止下位机没有反应
