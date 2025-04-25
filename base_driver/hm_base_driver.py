@@ -562,6 +562,10 @@ class HmBaseNode(Node):
                 return self._case_auto_dock(data_in_frame)
             if code == 121: #imu
                 return self._case_imu(data_in_frame)
+            if code == 129: #dock_ir
+                return None
+            if code == 130: #battery
+                return None
             else:
                 self.get_logger().warn(f"Unknown code_raw received: {code}")
                 return None
