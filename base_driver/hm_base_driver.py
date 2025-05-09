@@ -29,6 +29,11 @@ class BaseSerialError(Exception):
 
 class HmBaseNode(Node):
     def __init__(self):
+        super().__init__('hm_serial_node')
+        #增加 parameters server
+        self.declare_parameter('max_linear_speed', 0.01)
+        max_linear_speed_ = self.get_parameter('max_linear_speed').get_parameter_value()
+
         self.x = 0.0
         self.y = 0.0
         self.yaw = 0.0
@@ -166,6 +171,7 @@ class HmBaseNode(Node):
         )
 
         self.get_logger().info("Node initialized")
+
     
     # # 处理cmd_vel_nav
     # def handle_hm_cmd_vel_nav(self, msg):
