@@ -29,10 +29,25 @@ class BaseSerialError(Exception):
 
 class HmBaseNode(Node):
     def __init__(self):
-        super().__init__('hm_serial_node')
+        super().__init__('hm_base_node')
         #增加 parameters server
-        self.declare_parameter('max_linear_speed', 0.01)
-        max_linear_speed_ = self.get_parameter('max_linear_speed').get_parameter_value()
+        self.declare_parameter('max_linear_speed', 0.01)  # Default value as fallback
+        self.max_linear_speed_ = self.get_parameter('max_linear_speed').value
+        self.get_logger().info(f"From base.yaml loaded max_linear_speed: {self.max_linear_speed_}")
+        # new_param = rclpy.parameter.Parameter(
+        #     'max_linear_speed',
+        #     rclpy.Parameter.Type.DOUBLE,
+        #     0.01
+        # )
+        # all_new_parameters = [new_param]
+        # self.set_parameters(all_new_parameters)
+                # 强制同步参数到服务器（确保参数可见）
+        # self.set_parameters([rclpy.Parameter(
+        #     'max_linear_speed',
+        #     rclpy.Parameter.Type.DOUBLE,
+        #     self.max_linear_speed_
+        # )])
+        # self.get_logger().info(f"Parameter set: max_linear_speed={self.max_linear_speed_}")
 
         self.x = 0.0
         self.y = 0.0
@@ -72,8 +87,6 @@ class HmBaseNode(Node):
 
         # self.cmd_vel_exec_tag = True
         self.count_0x00 = 0
-
-        super().__init__('hm_serial_node')
         self.tf_broadcaster = TransformBroadcaster(self)
         
         self.control_data_head = b'\xAA\x55'
@@ -81,31 +94,31 @@ class HmBaseNode(Node):
 
         self.is_near_dock = 0
 
-        # 初始化下位机串口连接
-        self.ser_base = serial.Serial(
-            port='/dev/ttyUSB1',
-            baudrate=115200,
-            bytesize=serial.EIGHTBITS,
-            parity=serial.PARITY_NONE,
-            stopbits=serial.STOPBITS_ONE,
-            timeout=1
-        )
-        if not self.ser_base.is_open:
-            self.get_logger().error("Failed to open serial port!")
-            raise Exception("Serial port open failed")
+        # # 初始化下位机串口连接
+        # self.ser_base = serial.Serial(
+        #     port='/dev/ttyUSB1',
+        #     baudrate=115200,
+        #     bytesize=serial.EIGHTBITS,
+        #     parity=serial.PARITY_NONE,
+        #     stopbits=serial.STOPBITS_ONE,
+        #     timeout=1
+        # )
+        # if not self.ser_base.is_open:
+        #     self.get_logger().error("Failed to open serial port!")
+        #     raise Exception("Serial port open failed")
 
-        # 初始化Android串口连接
-        self.ser_android = serial.Serial(
-            port='/dev/ttyUSB2',
-            baudrate=115200,
-            bytesize=serial.EIGHTBITS,
-            parity=serial.PARITY_NONE,
-            stopbits=serial.STOPBITS_ONE,
-            timeout=1
-        )
-        if not self.ser_android.is_open:
-            self.get_logger().error("Failed to open android serial port!")
-            raise Exception("Android serial port open failed")
+        # # 初始化Android串口连接
+        # self.ser_android = serial.Serial(
+        #     port='/dev/ttyUSB2',
+        #     baudrate=115200,
+        #     bytesize=serial.EIGHTBITS,
+        #     parity=serial.PARITY_NONE,
+        #     stopbits=serial.STOPBITS_ONE,
+        #     timeout=1
+        # )
+        # if not self.ser_android.is_open:
+        #     self.get_logger().error("Failed to open android serial port!")
+        #     raise Exception("Android serial port open failed")
 
         self.subscription = self.create_subscription(
             Twist,
@@ -322,7 +335,8 @@ class HmBaseNode(Node):
             MAX_SPEED = 0.23  # 最大线速度绝对值限制(m/s)
             abs_left = abs(left_speed)
             abs_right = abs(right_speed)
-            max_ratio = max(abs_left, abs_right) / MAX_SPEED
+            # max_ratio = max(abs_left, abs_right) / MAX_SPEED
+            max_ratio = max(abs_left, abs_right) / self.max_linear_speed_
             if max_ratio > 1.0:  # 需要限制
                 left_speed = left_speed / max_ratio
                 right_speed = right_speed / max_ratio
@@ -888,14 +902,14 @@ def main(args=None):
     try:
         # Start reading serial data in a separate thread
         import threading
-        serial_thread = threading.Thread(target=node.read_base_serial_data)
-        serial_thread.daemon = True
-        serial_thread.start()
+        # serial_thread = threading.Thread(target=node.read_base_serial_data)
+        # serial_thread.daemon = True
+        # serial_thread.start()
 
-        # Start reading android serial data in a separate thread
-        android_serial_thread = threading.Thread(target=node.read_android_serial_data)
-        android_serial_thread.daemon = True
-        android_serial_thread.start()
+        # # Start reading android serial data in a separate thread
+        # android_serial_thread = threading.Thread(target=node.read_android_serial_data)
+        # android_serial_thread.daemon = True
+        # android_serial_thread.start()
 
         # # query auto dock state
         # query_auto_dock_state_thread = threading.Thread(target=node.query_auto_dock_state)

@@ -34,6 +34,7 @@ setup(
         'console_scripts': [
             'ir_receiver_node = base_driver.ir_receiver:main',
             'hm_base_node = base_driver.hm_base_driver:main',
+            'params_dumper_server = base_driver.params_dumper_server:main',
         ],
     },
 )
