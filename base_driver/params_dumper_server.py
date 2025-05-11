@@ -3,8 +3,9 @@ from rclpy.node import Node
 import yaml
 import os
 from ament_index_python.packages import get_package_share_directory
-from rcl_interfaces.srv import GetParameters
-from rcl_interfaces.srv import ListParameters
+from rcl_interfaces.srv import ListParameters, GetParameters
+from rcl_interfaces.msg import ParameterValue
+from rcl_interfaces.msg import ParameterType
 
 class ParamsDumperServer(Node):
     def __init__(self):
@@ -16,61 +17,71 @@ class ParamsDumperServer(Node):
         self.dump_parameters('hm_base_driver_node', output_path)
 
     def dump_parameters(self, node_name, output_file):
-        # Get list of all nodes
-        node_names = self.get_node_names()
-        
-        if node_name not in node_names:
+        if node_name not in self.get_node_names():
             self.get_logger().error(f"Node '{node_name}' not found!")
             return
 
-        # Get parameters from the node
-        client = self.create_client(
-            GetParameters,
-            f'/{node_name}/get_parameters'
-        )
-        
-        if not client.wait_for_service(timeout_sec=5.0):
-            self.get_logger().error(f"Service not available for {node_name}")
+        list_client = self.create_client(ListParameters, f'/{node_name}/list_parameters')
+        get_client = self.create_client(GetParameters, f'/{node_name}/get_parameters')
+
+        # List parameters
+        if not list_client.wait_for_service(timeout_sec=3.0):
+            self.get_logger().error("list_parameters service unavailable")
             return
 
-        # # Get all parameter names
-        # list_client = self.create_client(
-        #     GetParameters,
-        #     f'/{node_name}/list_parameters'  # Use list_parameters service
-        # )
-        # if not list_client.wait_for_service(timeout_sec=1.0):
-        #     self.get_logger().error("list_parameters service unavailable")
-        #     return
-        # list_request = GetParameters.Request()
-        # list_future = list_client.call_async(list_request)
-        # rclpy.spin_until_future_complete(self, list_future)
-        # if list_future.result() is None:
-        #     self.get_logger().error("Failed to list parameters")
-        #     return
-        # param_names = list_future.result().names  # Get names from response
+        list_future = list_client.call_async(ListParameters.Request())
+        rclpy.spin_until_future_complete(self, list_future)
 
-        request = GetParameters.Request()
-        request.names = ['*']
+        if list_future.result() is None:
+            self.get_logger().error("Failed to list parameters")
+            return
 
-        future = client.call_async(request)
-        rclpy.spin_until_future_complete(self, future)
+        param_names = list_future.result().result.names
+        if not param_names:
+            self.get_logger().warning(f"No parameters found for {node_name}")
+            return
 
-        if future.result() is not None:
+        # Get parameter values
+        get_request = GetParameters.Request()
+        get_request.names = param_names
+        get_future = get_client.call_async(get_request)
+        rclpy.spin_until_future_complete(self, get_future)
+
+        if get_future.result() is not None:
             params = {
                 node_name: {
                     'ros__parameters': {
-                        name: value.value 
-                        for name, value in zip(request.names, future.result().values)
+                        name: self._parameter_to_python(value)
+                        for name, value in zip(param_names, get_future.result().values)
                     }
                 }
             }
-
-            # Write to YAML file
             with open(output_file, 'w') as f:
                 yaml.dump(params, f, default_flow_style=False)
             self.get_logger().info(f"Parameters dumped to {output_file}")
-        else:
-            self.get_logger().error(f"Failed to get parameters from {node_name}")
+
+
+    def _parameter_to_python(self, param_value):
+        """Convert ParameterValue to Python native type"""
+        if param_value.type == ParameterType.PARAMETER_BOOL:
+            return param_value.bool_value
+        elif param_value.type == ParameterType.PARAMETER_INTEGER:
+            return param_value.integer_value
+        elif param_value.type == ParameterType.PARAMETER_DOUBLE:
+            return param_value.double_value
+        elif param_value.type == ParameterType.PARAMETER_STRING:
+            return param_value.string_value
+        elif param_value.type == ParameterType.PARAMETER_BYTE_ARRAY:
+            return list(param_value.byte_array_value)
+        elif param_value.type == ParameterType.PARAMETER_BOOL_ARRAY:
+            return list(param_value.bool_array_value)
+        elif param_value.type == ParameterType.PARAMETER_INTEGER_ARRAY:
+            return list(param_value.integer_array_value)
+        elif param_value.type == ParameterType.PARAMETER_DOUBLE_ARRAY:
+            return list(param_value.double_array_value)
+        elif param_value.type == ParameterType.PARAMETER_STRING_ARRAY:
+            return list(param_value.string_array_value)
+        return None
 
 def main(args=None):
     rclpy.init(args=args)
