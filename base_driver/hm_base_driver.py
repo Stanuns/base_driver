@@ -94,31 +94,31 @@ class HmBaseNode(Node):
 
         self.is_near_dock = 0
 
-        # # 初始化下位机串口连接
-        # self.ser_base = serial.Serial(
-        #     port='/dev/ttyUSB1',
-        #     baudrate=115200,
-        #     bytesize=serial.EIGHTBITS,
-        #     parity=serial.PARITY_NONE,
-        #     stopbits=serial.STOPBITS_ONE,
-        #     timeout=1
-        # )
-        # if not self.ser_base.is_open:
-        #     self.get_logger().error("Failed to open serial port!")
-        #     raise Exception("Serial port open failed")
+        # 初始化下位机串口连接
+        self.ser_base = serial.Serial(
+            port='/dev/ttyUSB1',
+            baudrate=115200,
+            bytesize=serial.EIGHTBITS,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            timeout=1
+        )
+        if not self.ser_base.is_open:
+            self.get_logger().error("Failed to open serial port!")
+            raise Exception("Serial port open failed")
 
-        # # 初始化Android串口连接
-        # self.ser_android = serial.Serial(
-        #     port='/dev/ttyUSB2',
-        #     baudrate=115200,
-        #     bytesize=serial.EIGHTBITS,
-        #     parity=serial.PARITY_NONE,
-        #     stopbits=serial.STOPBITS_ONE,
-        #     timeout=1
-        # )
-        # if not self.ser_android.is_open:
-        #     self.get_logger().error("Failed to open android serial port!")
-        #     raise Exception("Android serial port open failed")
+        # 初始化Android串口连接
+        self.ser_android = serial.Serial(
+            port='/dev/ttyUSB2',
+            baudrate=115200,
+            bytesize=serial.EIGHTBITS,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            timeout=1
+        )
+        if not self.ser_android.is_open:
+            self.get_logger().error("Failed to open android serial port!")
+            raise Exception("Android serial port open failed")
 
         self.subscription = self.create_subscription(
             Twist,
@@ -902,14 +902,14 @@ def main(args=None):
     try:
         # Start reading serial data in a separate thread
         import threading
-        # serial_thread = threading.Thread(target=node.read_base_serial_data)
-        # serial_thread.daemon = True
-        # serial_thread.start()
+        serial_thread = threading.Thread(target=node.read_base_serial_data)
+        serial_thread.daemon = True
+        serial_thread.start()
 
-        # # Start reading android serial data in a separate thread
-        # android_serial_thread = threading.Thread(target=node.read_android_serial_data)
-        # android_serial_thread.daemon = True
-        # android_serial_thread.start()
+        # Start reading android serial data in a separate thread
+        android_serial_thread = threading.Thread(target=node.read_android_serial_data)
+        android_serial_thread.daemon = True
+        android_serial_thread.start()
 
         # # query auto dock state
         # query_auto_dock_state_thread = threading.Thread(target=node.query_auto_dock_state)
