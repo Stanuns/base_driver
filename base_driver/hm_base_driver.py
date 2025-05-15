@@ -10,6 +10,7 @@ import serial
 import struct
 from robot_interfaces.msg import HMAutoDockState
 from robot_interfaces.msg import HMAutoDockTrigger
+from robot_interfaces.msg import Battery
 import time
 import traceback
 from tf_transformations import quaternion_from_euler
@@ -31,9 +32,9 @@ class HmBaseNode(Node):
     def __init__(self):
         super().__init__('hm_base_node')
         #增加 parameters server
-        self.declare_parameter('max_linear_speed', 0.01)  # Default value as fallback
+        self.declare_parameter('max_linear_speed', 0.23)  # Default value as fallback
         self.max_linear_speed_ = self.get_parameter('max_linear_speed').value
-        self.get_logger().info(f"From base.yaml loaded max_linear_speed: {self.max_linear_speed_}")
+        # self.get_logger().info(f"From base.yaml loaded max_linear_speed: {self.max_linear_speed_}")
         # new_param = rclpy.parameter.Parameter(
         #     'max_linear_speed',
         #     rclpy.Parameter.Type.DOUBLE,
@@ -48,6 +49,13 @@ class HmBaseNode(Node):
         #     self.max_linear_speed_
         # )])
         # self.get_logger().info(f"Parameter set: max_linear_speed={self.max_linear_speed_}")
+        self.declare_parameter('max_angular_speed', 3.43)  # if max_linear_speed is 0.23m/s, then max_angular_speed = (0.23-(-0.23))/self.wheelSeparate
+        self.max_linear_speed_ = self.get_parameter('max_linear_speed').value
+
+        #底盘相关软硬件参数
+        self.declare_parameter('version_MCU', 'mcu_1.0.0');
+        self.declare_parameter('version_main_control_soft','mcs_1.0.0')
+        self.declare_parameter('battery_level', 0.50)
 
         self.x = 0.0
         self.y = 0.0
@@ -183,6 +191,19 @@ class HmBaseNode(Node):
             10
         )
 
+        self.battery_publisher = self.create_publisher(
+            Battery,
+            '/battery',
+            10
+        )
+        #根据/battery的值更新 参数battery_level
+        self.subscription = self.create_subscription(
+            Battery,
+            '/battery',
+            self.handle_battery,
+            10
+        )
+
         self.get_logger().info("Node initialized")
 
     
@@ -313,6 +334,20 @@ class HmBaseNode(Node):
     #                 self.count_0x00 += 1
     #         time.sleep(self.run_time/1000)
     #     # pass
+
+    def handle_battery(self, msg):
+        try:
+            level_value = msg.level/100
+            self.set_parameters([rclpy.parameter.Parameter(
+                'battery_level',
+                rclpy.Parameter.Type.DOUBLE,
+                level_value
+            )])
+        except ValueError as e:
+            self.get_logger().warn(f"handle_battery Invalid value: {e}")
+
+
+
 
     #速度下发指令
     def handle_cmd_vel(self, msg):
@@ -567,6 +602,8 @@ class HmBaseNode(Node):
                     self.cast_dock_state(data)
                 elif income_data_type =='imu':
                     self.cast_imu(data)
+                elif income_data_type =='battery':
+                    self.cast_battery(data)
                 else: 
                     pass
                     return
@@ -585,7 +622,7 @@ class HmBaseNode(Node):
             if code == 129: #dock_ir
                 return None
             if code == 130: #battery
-                return None
+                return self._case_battery(data_in_frame)
             else:
                 self.get_logger().warn(f"Unknown code_raw received: {code}")
                 return None
@@ -644,7 +681,7 @@ class HmBaseNode(Node):
     
     @staticmethod
     def _case_odom(data_raw): 
-        if len(data_raw) != 20:  # refer to the data sheet provided by jinfei
+        if len(data_raw) != 20:  #核心数据长度
             e = BaseSerialError()
             e.message = "Odom data corrupted"
             raise e
@@ -658,7 +695,7 @@ class HmBaseNode(Node):
         return data
     @staticmethod
     def _case_auto_dock(data_raw):
-        if len(data_raw) != 2:  # refer to the data sheet provided by jinfei
+        if len(data_raw) != 2:  
             e = BaseSerialError()
             e.message = "dock state data corrupted"
             raise e
@@ -669,7 +706,7 @@ class HmBaseNode(Node):
         return data
     @staticmethod
     def _case_imu(data_raw): 
-        if len(data_raw) != 36:  # refer to the data sheet provided by jinfei
+        if len(data_raw) != 36:  #核心数据长度
             e = BaseSerialError()
             e.message = "imu data corrupted"
             raise e
@@ -685,6 +722,18 @@ class HmBaseNode(Node):
         data['pitch_raw'] = pitch_raw
         data['yaw_raw'] = yaw_raw
         return data
+    @staticmethod
+    def _case_battery(data_raw): 
+        if len(data_raw) != 2:  #核心数据长度
+            e = BaseSerialError()
+            e.message = "imu data corrupted"
+            raise e
+        data = {'type': 'battery'}
+        battery_level, if_charge = struct.unpack('BB', data_raw)
+        data['level'] = battery_level
+        data['charged'] = if_charge
+        return data
+
 
 
     def cast_odom(self, data):
@@ -793,6 +842,14 @@ class HmBaseNode(Node):
         msg.orientation.w =  quat[3]
         msg.orientation_covariance = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self.imu_publisher.publish(msg)
+    
+    def cast_battery(self, data):
+        msg = Battery()
+        msg.header.frame_id = 'battery_link'
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.level = data.get('level')
+        msg.charged = data.get('charged')
+        self.battery_publisher.publish(msg)
 
     ### 读取Android pad返回信息
     def read_android_serial_data(self):
