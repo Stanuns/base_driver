@@ -53,8 +53,8 @@ class HmBaseNode(Node):
         self.max_linear_speed_ = self.get_parameter('max_linear_speed').value
 
         #底盘相关软硬件参数
-        self.declare_parameter('version_MCU', 'mcu_1.0.0');
-        self.declare_parameter('version_main_control_soft','mcs_1.0.0')
+        self.declare_parameter('version_mcu', 'mcu_1.0.0');
+        self.declare_parameter('version_main_control_sw','mcs_1.0.0')
         self.declare_parameter('battery_level', 0.50)
 
         self.x = 0.0
